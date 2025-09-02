@@ -1,3 +1,6 @@
+PORT=3000
+BOT_API_KEY=MINHA_CHAVE_SECRETA_123
+ALLOWED_ORIGIN=*
 const openWaBot = dlg.querySelector("#openWaBot");
 openWaBot?.addEventListener("click", async ()=>{
   const num = (lead.phone||'').replace(/\D/g,'');
