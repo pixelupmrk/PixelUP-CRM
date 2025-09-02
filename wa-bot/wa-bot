@@ -1,3 +1,5 @@
+HTTP listening on 3000
+QR pronto em /qr
 npm install
 npm run start   # (ou: node server.js)
 PORT=3000
