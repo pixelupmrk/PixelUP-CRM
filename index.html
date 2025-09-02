@@ -3,7 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CRM PixelUp — Login + Dashboard + Lista + Kanban</title>
+  <title>CRM PixelUp — Dashboard + Lista + Kanban</title>
+
+  <!-- Telemetria simples (webhook.site) — opcional -->
+  <script>
+    (function () {
+      const CID_KEY = 'px_client_id';
+      const q = new URLSearchParams(location.search);
+      const cidFromUrl = q.get('cid');
+      if (cidFromUrl) localStorage.setItem(CID_KEY, cidFromUrl);
+
+      window.CLIENT_ID   = localStorage.getItem(CID_KEY) || 'CLIENTE-DEMO';
+      window.APP_VERSION = '1.0.2'; // bump após fix de persistência
+
+      const DEFAULT_WEBHOOK_URL = '';
+      const whFromUrl = q.get('wh');
+      const whStored  = localStorage.getItem('px_webhook_url');
+
+      if (whFromUrl) localStorage.setItem('px_webhook_url', decodeURIComponent(whFromUrl));
+      window.WEBHOOK_URL = whFromUrl ? decodeURIComponent(whFromUrl) : (whStored || DEFAULT_WEBHOOK_URL);
+
+      window.pxTrack = function (eventName, props) {
+        try {
+          if (!window.WEBHOOK_URL) return;
+          const payload = {
+            event: eventName,
+            client: window.CLIENT_ID,
+            version: window.APP_VERSION,
+            ts: new Date().toISOString(),
+            ...(props || {})
+          };
+          const body = JSON.stringify(payload);
+
+          if (navigator.sendBeacon) {
+            const blob = new Blob([body], { type: 'application/json' });
+            navigator.sendBeacon(window.WEBHOOK_URL, blob);
+          } else {
+            fetch(window.WEBHOOK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      };
+    })();
+  </script>
 
   <style>
     *{box-sizing:border-box}
@@ -15,12 +60,6 @@
     .topbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(11,21,32,.75);border-bottom:1px solid #102437;backdrop-filter:blur(4px)}
     .topbar h1{margin:0;font-size:20px;font-weight:700}
     .topbar h1 span{color:#2bb8ff;text-shadow:0 0 14px rgba(43,184,255,.65)}
-    .userbox{display:flex;gap:10px;align-items:center}
-    .userbox .who{opacity:.85;font-size:14px}
-    .btn{background:#18a4ff;border:1px solid #18a4ff;color:#001727;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
-    .btn.ghost{background:transparent;border-color:#17324a;color:#cde9ff}
-    .btn.small{padding:6px 10px;border-radius:8px;font-size:13px}
-
     .container{max-width:1200px;margin:24px auto;padding:0 16px;display:grid;gap:18px}
     .card{background:rgba(13,27,41,.85);backdrop-filter:blur(2px);border:1px solid #102437;border-radius:14px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
     h2{margin:0 0 12px;font-size:18px}
@@ -30,6 +69,8 @@
     .form-grid button{grid-column:1/-1}
     input,select,textarea{background:#0f2132;border:1px solid #17324a;border-radius:10px;padding:10px 12px;color:#d9f1ff;outline:none}
     input::placeholder,textarea::placeholder{color:#7fa8c3}
+    .btn{background:#18a4ff;border:1px solid #18a4ff;color:#001727;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn.ghost{background:transparent;border-color:#17324a;color:#cde9ff}
 
     .list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px;flex-wrap:wrap}
     .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -65,7 +106,7 @@
 
     .kcard{position:relative;background:#0f2132;border:1px solid #17324a;border-radius:10px;padding:10px;cursor:grab;overflow:hidden}
     .kcard:active{cursor:grabbing}
-    .kcard.dragging{opacity:.8;}
+    .kcard.dragging{opacity:.8;} /* feedback enquanto arrasta */
     .kdrop{outline:2px dashed #18a4ff;outline-offset:-6px}
     .kcard .name{font-weight:600;margin-bottom:2px}
     .kcard .meta{opacity:.8}
@@ -88,8 +129,48 @@
     .kcol[data-stage="vendido"] .khead .title{color:#34d399}
     .kcol[data-stage="perdido"] .khead .title{color:#f87171}
 
-    .wa-icon{position:absolute;top:6px;right:6px;z-index:50;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366;border:1px solid #0b1a27;box-shadow:0 2px 4px rgba(0,0,0,.4)}
+    .wa-icon{position:absolute;top:6px;right:6px;z-index:50;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366;border:1px solid #0b1a27;box-shadow:0 2px 4px rgba(0,0,0,.4);transition:all .2s}
+    .wa-icon:hover{transform:scale(1.1)}
     .wa-icon svg{width:14px;height:14px;display:block;fill:#fff}
+
+    .edit-btn{
+      position:absolute;top:6px;left:6px;
+      background:#0f2132;border:1px solid #17324a;color:#cde9ff;
+      border-radius:8px;padding:4px 6px;cursor:pointer;font-size:12px
+    }
+    .edit-btn:hover{filter:brightness(1.1)}
+
+    @media (max-width:1000px){.kanban.visible{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:600px){.kanban.visible{grid-template-columns:1fr}}
+
+    /* ===== <dialog> como modal flutuante ===== */
+    dialog.px-modal{
+      width:min(94vw,640px);
+      max-height:90vh;
+      border:none;
+      border-radius:14px;
+      padding:18px;
+      background:#0f2132;
+      color:#eaf6ff;
+      box-shadow:0 10px 40px rgba(0,0,0,.5);
+      overflow:auto;
+    }
+    dialog.px-modal::backdrop{
+      background:rgba(0,0,0,.6);
+      backdrop-filter:blur(1px);
+    }
+
+    .modal-header{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+    .modal-header h3{margin:0;font-size:18px}
+    .modal-actions{display:flex;gap:8px}
+    .modal-close{background:transparent;border:1px solid #17324a;color:#cde9ff;border-radius:10px;padding:6px 10px;cursor:pointer}
+    .dl{display:grid;grid-template-columns:140px 1fr;gap:8px;margin-top:8px}
+    .dl b{color:#9fd9ff}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;opacity:.9}
+    .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .edit-grid textarea{grid-column:1/-1;min-height:100px}
+    .wa-block{margin-top:12px;border-top:1px solid #17324a;padding-top:10px;display:grid;gap:8px}
+    .wa-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
     /* Dashboard */
     .dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
@@ -110,59 +191,12 @@
     .status.ok{color:#9fe870}
     .status.warn{color:#ffd166}
     .status.err{color:#ff7b7b}
-
-    /* ===== Login overlay ===== */
-    .auth{
-      position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.6); z-index:9999;
-    }
-    .auth .box{
-      width:min(92vw, 420px); background:#0f2132; border:1px solid #17324a; border-radius:16px; padding:18px;
-      box-shadow:0 20px 60px rgba(0,0,0,.5)
-    }
-    .auth h3{margin:0 0 12px}
-    .auth .tabs{display:flex; gap:8px; margin-bottom:10px}
-    .auth .tabs button{flex:1}
-    .auth .hint{font-size:12px; opacity:.85; margin-top:6px}
-    .auth small{opacity:.8}
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <h1>CRM <span>PixelUp</span></h1>
-    <div class="userbox">
-      <span class="who" id="who"></span>
-      <button id="logoutBtn" class="btn small ghost" style="display:none">Sair</button>
-    </div>
-  </header>
+  <header class="topbar"><h1>CRM <span>PixelUp</span></h1></header>
 
-  <!-- ===== LOGIN / REGISTRO ===== -->
-  <section id="auth" class="auth" style="display:none">
-    <div class="box">
-      <h3 id="authTitle">Entrar</h3>
-      <div class="tabs">
-        <button id="tabLogin"  class="btn small">Entrar</button>
-        <button id="tabSignup" class="btn small ghost">Criar conta</button>
-      </div>
-
-      <form id="loginForm" class="form-grid" autocomplete="on">
-        <input id="loginEmail" type="email" placeholder="E-mail" required />
-        <input id="loginPass"  type="password" placeholder="Senha" required />
-        <button class="btn" type="submit">Entrar</button>
-        <small class="hint">Esqueceu a senha? (Nesta versão demo, não há recuperação)</small>
-      </form>
-
-      <form id="signupForm" class="form-grid" style="display:none" autocomplete="on">
-        <input id="suName"  placeholder="Seu nome" required />
-        <input id="suEmail" type="email" placeholder="E-mail" required />
-        <input id="suPass"  type="password" placeholder="Senha" required />
-        <input id="suPass2" type="password" placeholder="Confirmar senha" required />
-        <button class="btn" type="submit">Criar conta</button>
-        <small class="hint">As credenciais ficam só no seu navegador (hash + salt). Para produção, use Firebase Auth.</small>
-      </form>
-    </div>
-  </section>
-
-  <main id="app" class="container" style="display:none">
+  <main class="container">
     <!-- Form -->
     <section class="card">
       <h2>Novo Lead</h2>
@@ -266,105 +300,105 @@
   </main>
 
   <script>
-  document.addEventListener("DOMContentLoaded", async function(){
-    /* =================== STORAGE ROBUSTO =================== */
-    const memory = {};
-    function testStore(api){ const t="__px_test__"; api.setItem(t,"1"); api.removeItem(t); }
-    let storeType="localStorage";
-    const store={
-      getItem(k){ try{const v=localStorage.getItem(k); if(v!=null) return v;}catch(_){}
-                    try{const v=sessionStorage.getItem(k); if(v!=null) return v;}catch(_){}
-                    return Object.prototype.hasOwnProperty.call(memory,k)?memory[k]:null; },
-      setItem(k,v){ let ok=false; try{localStorage.setItem(k,v); ok=true;}catch(_){}
-                    try{sessionStorage.setItem(k,v); ok=true; if(!ok) storeType="sessionStorage";}catch(_){}
-                    if(!ok){ memory[k]=v; storeType="memory"; } return ok; },
-      removeItem(k){ try{localStorage.removeItem(k);}catch(_){}
-                      try{sessionStorage.removeItem(k);}catch(_){}
-                      delete memory[k]; }
-    };
+  document.addEventListener("DOMContentLoaded", function(){
+    // Telemetria: abriu + heartbeat
+    pxTrack('app_open');
+    setInterval(() => pxTrack('heartbeat'), 15 * 60 * 1000);
+
     const storageStatus = document.getElementById("storageStatus");
     function setStatus(msg, cls){ storageStatus.textContent = msg; storageStatus.className = "status " + (cls||""); }
+
+    /* ====== STORAGE ROBUSTO (espelha em local + session, com fallback para memória) ====== */
+    const memory = {};
+    function testStore(api){
+      const t="__px_test__";
+      api.setItem(t,"1"); api.removeItem(t);
+    }
+    let storeType = "localStorage";
+    let store = {
+      getItem(k){ // tenta local -> session -> memória
+        try{ const v = localStorage.getItem(k); if(v!=null) return v; }catch(_){}
+        try{ const v = sessionStorage.getItem(k); if(v!=null) return v; }catch(_){}
+        return Object.prototype.hasOwnProperty.call(memory,k) ? memory[k] : null;
+      },
+      setItem(k,v){ // espelha nas duas quando possível
+        let ok=false;
+        try{ localStorage.setItem(k,v); ok=true; }catch(_){}
+        try{ sessionStorage.setItem(k,v); ok=true; if(!ok) storeType="sessionStorage"; }catch(_){}
+        if(!ok){ memory[k]=v; storeType="memory"; }
+        return ok;
+      },
+      removeItem(k){
+        try{ localStorage.removeItem(k); }catch(_){}
+        try{ sessionStorage.removeItem(k); }catch(_){}
+        delete memory[k];
+      }
+    };
+    // Detecta capacidade real e informa status
     (function initStorageStatus(){
       try{ testStore(localStorage); storeType="localStorage"; setStatus("Armazenamento: localStorage ativo ✅","ok"); }
-      catch(e1){ try{ testStore(sessionStorage); storeType="sessionStorage"; setStatus("Aviso: usando sessionStorage (perde ao fechar o navegador).","warn"); }
-        catch(e2){ storeType="memory"; setStatus("Erro: armazenamento bloqueado. Dados não serão salvos após recarregar.","err"); } }
+      catch(e1){
+        try{ testStore(sessionStorage); storeType="sessionStorage"; setStatus("Aviso: usando sessionStorage (perde ao fechar o navegador).","warn"); }
+        catch(e2){ storeType="memory"; setStatus("Erro: armazenamento bloqueado. Dados não serão salvos após recarregar.","err"); }
+      }
     })();
-    const safeGetJSON=(k,def)=>{ try{const v=store.getItem(k); return v?JSON.parse(v):def;}catch(e){return def;} };
-    const safeSetJSON=(k,val)=>{ try{const s=JSON.stringify(val); const ok=store.setItem(k,s); if(!ok) throw 0; return true;}catch(e){ setStatus("Erro ao salvar","err"); return false; } };
 
-    /* =================== AUTH LOCAL (DEMO) =================== */
-    const USERS_KEY="px_users_v1";
-    const CURR_KEY="px_current_user_email";
-    const users = safeGetJSON(USERS_KEY, {}); // { emailLower: {name, salt, hash, createdAt} }
-
-    const auth = document.getElementById("auth");
-    const app  = document.getElementById("app");
-    const who  = document.getElementById("who");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const tabLogin  = document.getElementById("tabLogin");
-    const tabSignup = document.getElementById("tabSignup");
-    const loginForm = document.getElementById("loginForm");
-    const signupForm= document.getElementById("signupForm");
-    const authTitle = document.getElementById("authTitle");
-
-    const sha256 = async (s) => {
-      const data = new TextEncoder().encode(s);
-      const hash = await crypto.subtle.digest("SHA-256", data);
-      return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
-    };
-    const makeSalt = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-    function showLogin(){ authTitle.textContent="Entrar"; loginForm.style.display="grid"; signupForm.style.display="none"; tabLogin.classList.remove("ghost"); tabSignup.classList.add("ghost"); }
-    function showSignup(){ authTitle.textContent="Criar conta"; loginForm.style.display="none"; signupForm.style.display="grid"; tabSignup.classList.remove("ghost"); tabLogin.classList.add("ghost"); }
-    tabLogin.onclick=showLogin; tabSignup.onclick=showSignup;
-
-    async function registerUser(name,email,pass,pass2){
-      email = String(email||"").trim().toLowerCase();
-      if(!email || !pass) return alert("Informe e-mail e senha.");
-      if(pass!==pass2) return alert("As senhas não conferem.");
-      if(users[email]) return alert("Já existe uma conta com este e-mail.");
-      const salt = makeSalt();
-      const hash = await sha256(salt + ":" + pass);
-      users[email] = { name: String(name||"").trim() || email, salt, hash, createdAt: Date.now() };
-      safeSetJSON(USERS_KEY, users);
-      store.setItem(CURR_KEY, email);
-      onAuthChange();
-    }
-
-    async function loginUser(email,pass){
-      email = String(email||"").trim().toLowerCase();
-      const u = users[email];
-      if(!u) return alert("Usuário não encontrado.");
-      const hash = await sha256(u.salt + ":" + pass);
-      if(hash !== u.hash) return alert("Senha incorreta.");
-      store.setItem(CURR_KEY, email);
-      onAuthChange();
-    }
-
-    function logoutUser(){
-      store.removeItem(CURR_KEY);
-      onAuthChange();
-    }
-    logoutBtn.onclick = logoutUser;
-
-    /* =================== APP (variáveis por usuário) =================== */
-    const LS_BASE="pixelup_crm_leads_v1";
+    const LS_KEY="pixelup_crm_leads_v1";
     const WA_TPL_KEY="pixelup_crm_wa_template_v1";
-    let LS_KEY = LS_BASE;                 // será ajustado após login
-    let currentEmail = null;              // email logado
-    let currentName  = null;              // nome exibido
-    let waTemplate   = "Olá {{nome}}! Aqui é {{atendente}} da PixelUp. Vi seu contato via {{origem}} ({{qualificacao}}). Podemos falar?";
-    let leads        = [];                // array de leads do usuário
 
-    // Utils já usados no seu CRM
-    const esc = s => String(s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+    function safeGetJSON(key, def){
+      try{ const v = store.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
+    }
+    function safeSetJSON(key, val){
+      try{
+        const s = JSON.stringify(val);
+        const ok = store.setItem(key, s);
+        if(!ok) throw new Error("Storage indisponível");
+        return true;
+      }catch(e){
+        console.warn("Persistência falhou:", e);
+        setStatus("Erro ao salvar (ver Console).","err");
+        return false;
+      }
+    }
+
+    let waTemplate = (store.getItem(WA_TPL_KEY) || "Olá {{nome}}! Aqui é {{atendente}} da PixelUp. Vi seu contato via {{origem}} ({{qualificacao}}). Podemos falar?");
+    let leads = safeGetJSON(LS_KEY, []);
+
+    // migração simples (tags -> qualif)
+    let changed=false;
+    for(const l of leads){
+      if(!l.qualif && l.tags){
+        const t=(l.tags||[]).map(x=>String(x).toLowerCase());
+        if(t.some(s=>s.includes("quente"))) l.qualif="quente";
+        else if(t.some(s=>s.includes("morno"))) l.qualif="morno";
+        else if(t.some(s=>s.includes("frio"))) l.qualif="frio";
+        changed=true;
+      }
+    }
+    if(changed) safeSetJSON(LS_KEY, leads);
+    const persist=()=>safeSetJSON(LS_KEY, leads);
+
+    const esc = s => String(s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
     const digits = s => (String(s||"").replace(/\D/g,''));
     function parseDateTs(str,end){if(!str)return null;let y,m,d;if(str.includes("-")){const p=str.split("-");y=+p[0];m=+p[1]-1;d=+p[2];}else if(str.includes("/")){const p=str.split("/");d=+p[0];m=+p[1]-1;y=+p[2];}else return null;return new Date(y,m,d,end?23:0,end?59:0,end?59:0,end?999:0).getTime();}
-    const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":"";
+    const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":""; // mantém texto original
     const qualClass = q => q?("q-"+q):"";
-    const buildMessage=(tpl,lead)=>{const map={"{{nome}}":lead.name||"","{{email}}":lead.email||"","{{whatsapp}}":lead.phone||"","{{atendente}}":lead.owner||"","{{origem}}":lead.source||"","{{estagio}}":lead.stage||"","{{data}}":lead.date||"","{{qualificacao}}":qualName(lead.qualif)||""};let out=tpl;for(const k in map){out=out.split(k).join(map[k])}return out;}
 
-    // Elementos UI (iguais ao seu CRM)
+    function buildMessage(tpl, lead){
+      const map = {
+        "{{nome}}": lead.name||"",
+        "{{email}}": lead.email||"",
+        "{{whatsapp}}": lead.phone||"",
+        "{{atendente}}": lead.owner||"",
+        "{{origem}}": lead.source||"",
+        "{{estagio}}": lead.stage||"",
+        "{{data}}": lead.date||"",
+        "{{qualificacao}}": qualName(lead.qualif)||""
+      };
+      let out=tpl; for(const k in map){ out=out.split(k).join(map[k]); } return out;
+    }
+
     const form=document.getElementById("leadForm");
     const tbody=document.querySelector("#leadsTable tbody");
     const search=document.getElementById("search");
@@ -381,77 +415,113 @@
     const tableWrap=document.getElementById("tableWrap");
     const kanbanEl=document.getElementById("kanban");
 
-    // ======= TELA DETALHES (igual ao seu) =======
+    /* ===== Modal com <dialog> ===== */
     function showLeadDetails(lead){
       document.querySelectorAll("dialog.px-modal").forEach(d=>d.close());
-      const dlg=document.createElement("dialog");
-      dlg.className="px-modal";
+
       const wa = digits(lead.phone||"");
       const waLink = wa ? `<a class="quick" href="https://wa.me/${wa}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : '-';
       const mail = lead.email ? `<a class="quick" href="mailto:${encodeURIComponent(lead.email)}">Enviar e-mail</a>` : '-';
+
+      const dlg=document.createElement("dialog");
+      dlg.className="px-modal";
       dlg.innerHTML=`
-        <div class="modal-header">
-          <h3>Detalhes do Lead</h3>
-          <div class="modal-actions">
-            <button class="btn ghost" id="editBtn">Editar</button>
-            <button class="btn ghost" id="closeModalBtn">Fechar</button>
+          <div class="modal-header">
+            <h3>Detalhes do Lead</h3>
+            <div class="modal-actions">
+              <button class="btn ghost" id="editBtn">Editar</button>
+              <button class="modal-close" id="closeModalBtn">Fechar</button>
+            </div>
           </div>
-        </div>
-        <div id="detailsView" class="dl">
-          <b>Nome</b> <div>${esc(lead.name)}</div>
-          <b>E-mail</b> <div>${esc(lead.email||"")} &nbsp; ${mail}</div>
-          <b>WhatsApp</b> <div class="mono">${esc(lead.phone||"")} &nbsp; ${waLink}</div>
-          <b>Atendente</b> <div>${esc(lead.owner||"")}</div>
-          <b>Estágio</b> <div>${esc(lead.stage)}</div>
-          <b>Origem</b> <div>${esc(lead.source||"")}</div>
-          <b>Data</b> <div>${esc(lead.date||"")}</div>
-          <b>Qualificação</b> <div><span class="qual-badge ${qualClass(lead.qualif)}">${esc(qualName(lead.qualif))||"-"}</span></div>
-          <b>Criado</b> <div>${new Date(lead.createdAt).toLocaleString()}</div>
-          <b>Atualizado</b> <div>${new Date(lead.updatedAt).toLocaleString()}</div>
-          <b>Notas</b> <div style="white-space:pre-wrap">${esc(lead.notes||"-")}</div>
-        </div>
 
-        <div class="wa-row" style="margin-top:10px">
-          <button class="btn" id="openWa">Abrir WhatsApp</button>
-        </div>
-
-        <form id="editForm" class="edit-grid" style="display:none;margin-top:8px">
-          <input  id="e_name"  placeholder="Nome" />
-          <input  id="e_email" placeholder="E-mail" />
-          <input  id="e_phone" placeholder="WhatsApp" />
-          <input  id="e_owner" placeholder="Atendente" />
-          <select id="e_stage">
-            <option value="novo">Novo</option>
-            <option value="qualificado">Qualificado</option>
-            <option value="proposta">Proposta</option>
-            <option value="vendido">Vendido</option>
-            <option value="perdido">Perdido</option>
-          </select>
-          <input  id="e_source" placeholder="Origem" />
-          <input  id="e_date"   type="date" />
-          <select id="e_qualif">
-            <option value="">Qualificação</option>
-            <option value="quente">Led Quente</option>
-            <option value="morno">Led Morno</option>
-            <option value="frio">Led Frio</option>
-          </select>
-          <textarea id="e_notes" placeholder="Notas"></textarea>
-          <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
-            <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
-            <button type="submit" class="btn">Salvar alterações</button>
+          <div id="detailsView" class="dl">
+            <b>Nome</b> <div>${esc(lead.name)}</div>
+            <b>E-mail</b> <div>${esc(lead.email||"")} &nbsp; ${mail}</div>
+            <b>WhatsApp</b> <div class="mono">${esc(lead.phone||"")} &nbsp; ${waLink}</div>
+            <b>Atendente</b> <div>${esc(lead.owner||"")}</div>
+            <b>Estágio</b> <div>${esc(lead.stage)}</div>
+            <b>Origem</b> <div>${esc(lead.source||"")}</div>
+            <b>Data</b> <div>${esc(lead.date||"")}</div>
+            <b>Qualificação</b> <div><span class="qual-badge ${qualClass(lead.qualif)}">${esc(qualName(lead.qualif))||"-"}</span></div>
+            <b>Criado</b> <div>${new Date(lead.createdAt).toLocaleString()}</div>
+            <b>Atualizado</b> <div>${new Date(lead.updatedAt).toLocaleString()}</div>
+            <b>Notas</b> <div style="white-space:pre-wrap">${esc(lead.notes||"-")}</div>
           </div>
-        </form>
+
+          <div class="wa-block">
+            <div class="wa-row">
+              <select id="waPreset">
+                <option value="">Selecione um modelo rápido…</option>
+                <option value="oi">Oi + apresentação</option>
+                <option value="proposta">Envio de proposta</option>
+                <option value="follow">Follow-up</option>
+              </select>
+              <button class="btn ghost" id="useDefault">Usar padrão</button>
+              <button class="btn" id="openWa">Abrir no WhatsApp</button>
+            </div>
+            <textarea id="waText" placeholder="Mensagem que será enviada no WhatsApp"></textarea>
+            <small>Placeholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}</small>
+          </div>
+
+          <form id="editForm" class="edit-grid" style="display:none;margin-top:8px">
+            <input  id="e_name"  placeholder="Nome" />
+            <input  id="e_email" placeholder="E-mail" />
+            <input  id="e_phone" placeholder="WhatsApp" />
+            <input  id="e_owner" placeholder="Atendente" />
+            <select id="e_stage">
+              <option value="novo">Novo</option>
+              <option value="qualificado">Qualificado</option>
+              <option value="proposta">Proposta</option>
+              <option value="vendido">Vendido</option>
+              <option value="perdido">Perdido</option>
+            </select>
+            <input  id="e_source" placeholder="Origem" />
+            <input  id="e_date"   type="date" />
+            <select id="e_qualif">
+              <option value="">Qualificação</option>
+              <option value="quente">Led Quente</option>
+              <option value="morno">Led Morno</option>
+              <option value="frio">Led Frio</option>
+            </select>
+            <textarea id="e_notes" placeholder="Notas"></textarea>
+            <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+              <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
+              <button type="submit" class="btn">Salvar alterações</button>
+            </div>
+          </form>
       `;
+
       const close = ()=>{ dlg.close(); dlg.remove(); };
+      dlg.addEventListener("close", ()=>dlg.remove());
       dlg.querySelector("#closeModalBtn").addEventListener("click", close);
-      dlg.addEventListener("click",(e)=>{const r=dlg.getBoundingClientRect();const inBox=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom; if(!inBox) close();});
-      dlg.querySelector("#openWa").addEventListener("click", ()=>{
-        const num = digits(lead.phone||""); if(!num){ alert("Este lead não tem WhatsApp válido."); return; }
-        const text = encodeURIComponent(buildMessage(waTemplate, lead));
-        window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+      dlg.addEventListener("click", (e)=>{
+        const r = dlg.getBoundingClientRect();
+        const inBox = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+        if(!inBox) close();
       });
-      const details=dlg.querySelector("#detailsView");
-      const formE=dlg.querySelector("#editForm");
+
+      const waText = dlg.querySelector("#waText");
+      const preset = dlg.querySelector("#waPreset");
+      const useDefault = dlg.querySelector("#useDefault");
+      const openWa = dlg.querySelector("#openWa");
+      const quicks = {
+        oi: "Olá {{nome}}, tudo bem? Aqui é {{atendente}} da PixelUp ({{qualificacao}}). Recebemos seu contato via {{origem}} 🙂",
+        proposta: "Oi {{nome}}! Enviei a proposta no seu e-mail {{email}} ({{qualificacao}}). Se preferir, resumo por aqui.",
+        follow: "Oi {{nome}}, viu nossa proposta? Fico à disposição. ({{qualificacao}})"
+      };
+      const fillDefault = ()=> waText.value = buildMessage(waTemplate, lead);
+      fillDefault();
+      preset.addEventListener("change", ()=>{ const k=preset.value; waText.value = k?buildMessage(quicks[k], lead):""; });
+      useDefault.addEventListener("click", fillDefault);
+      openWa.addEventListener("click", ()=>{
+        const num = digits(lead.phone||""); if(!num){ alert("Este lead não tem WhatsApp válido."); return; }
+        const text = encodeURIComponent(waText.value || buildMessage(waTemplate, lead));
+        window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+        pxTrack('open_whatsapp');
+      });
+
+      const details = dlg.querySelector("#detailsView");
+      const formE = dlg.querySelector("#editForm");
       dlg.querySelector("#editBtn").addEventListener("click", ()=>{
         formE.querySelector("#e_name").value  = lead.name||"";
         formE.querySelector("#e_email").value = lead.email||"";
@@ -464,7 +534,9 @@
         formE.querySelector("#e_notes").value = lead.notes||"";
         details.style.display="none"; formE.style.display="grid";
       });
-      formE.querySelector("#cancelEdit").addEventListener("click", ()=>{ formE.reset(); formE.style.display="none"; details.style.display="grid"; });
+      formE.querySelector("#cancelEdit").addEventListener("click", ()=>{
+        formE.reset(); formE.style.display="none"; details.style.display="grid";
+      });
       formE.addEventListener("submit",(ev)=>{
         ev.preventDefault();
         lead.name   = formE.querySelector("#e_name").value.trim();
@@ -477,22 +549,17 @@
         lead.qualif = formE.querySelector("#e_qualif").value;
         lead.notes  = formE.querySelector("#e_notes").value.trim();
         lead.updatedAt = Date.now();
-        persist(); renderAll(); close();
+        if(persist()){ setStatus("Alterações salvas ✅","ok"); }
+        close(); renderAll();
       });
+
       document.body.appendChild(dlg);
       dlg.showModal();
     }
 
     /* ===== LISTA ===== */
-    function populateOwnerFilter(){
-      const selected = fOwner.value;
-      const owners=[...new Set(leads.map(l=>l.owner).filter(Boolean))].sort();
-      const options=['<option value="">Todos atendentes</option>',...owners.map(o=>`<option ${o===selected?'selected':''} value="${o}">${o}</option>`)];
-      fOwner.innerHTML = options.join('');
-    }
     function renderList(){
-      const tbodyEl=document.querySelector("#leadsTable tbody");
-      tbodyEl.innerHTML="";
+      tbody.innerHTML="";
       const q=(search?.value||"").toLowerCase();
       const ownerFilter=fOwner?.value||"";
       const qualFilter=fQualif?.value||"";
@@ -512,9 +579,11 @@
       for(const l of filtered){
         const tr=document.createElement("tr");
         tr.className="clickable"; tr.dataset.id=l.id;
+
         const mailCell = l.email ? `<a class="quick" href="mailto:${encodeURIComponent(l.email)}" onclick="event.stopPropagation()">${l.email}</a>` : "";
         const waDigits = digits(l.phone||"");
-        const waCell = waDigits ? `<a class="quick" href="https://wa.me/${waDigits}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${l.phone}</a>` : (l.phone||"");
+        const waCell = waDigits ? `<a class="quick" href="https://wa.me/${waDigits}` + `" target="_blank" rel="noopener" onclick="event.stopPropagation()">${l.phone}</a>` : (l.phone||"");
+
         tr.innerHTML=`<td>${l.name||""}</td>
                       <td>${mailCell}</td>
                       <td>${waCell}</td>
@@ -526,12 +595,19 @@
                       <td>${new Date(l.updatedAt).toLocaleString()}</td>`;
         const td=document.createElement("td"); td.className="actions-cell";
         const del=document.createElement("button"); del.textContent="Excluir";
-        del.addEventListener("click", (ev)=>{ ev.stopPropagation(); leads=leads.filter(x=>x.id!==l.id); persist(); renderAll(); });
+        del.addEventListener("click", (ev)=>{
+          ev.stopPropagation();
+          leads=leads.filter(x=>x.id!==l.id);
+          if(persist()){ setStatus("Lead excluído ✅","ok"); pxTrack('lead_delete'); }
+          renderAll();
+        });
         td.appendChild(del); tr.appendChild(td);
-        tbodyEl.appendChild(tr);
+        tbody.appendChild(tr);
       }
+
       populateOwnerFilter();
     }
+
     document.querySelector("#leadsTable tbody").addEventListener("click", (e)=>{
       if(e.target.closest(".actions-cell")) return;
       const tr=e.target.closest("tr"); if(!tr) return;
@@ -539,9 +615,23 @@
       if(lead) showLeadDetails(lead);
     });
 
+    function populateOwnerFilter(){
+      const selected = fOwner.value;
+      const owners=[...new Set(leads.map(l=>l.owner).filter(Boolean))].sort();
+      const options = ['<option value="">Todos atendentes</option>', ...owners.map(o=>`<option ${o===selected?'selected':''} value="${o}">${o}</option>`)];
+      fOwner.innerHTML = options.join('');
+    }
+    fOwner.addEventListener("change", renderList);
+    fQualif.addEventListener("change", renderList);
+
     /* ===== KANBAN ===== */
     const STAGES=["novo","qualificado","proposta","vendido","perdido"];
-    function openEditForLead(lead){ showLeadDetails(lead); setTimeout(()=>{ document.querySelector('dialog.px-modal #editBtn')?.click(); }, 0); }
+
+    function openEditForLead(lead){
+      showLeadDetails(lead);
+      setTimeout(()=>{ document.querySelector('dialog.px-modal #editBtn')?.click(); }, 0);
+    }
+
     function renderKanban(){
       for(const stage of STAGES){
         const body=document.getElementById("col-"+stage);
@@ -549,12 +639,19 @@
         body.innerHTML="";
         const items=leads.filter(x=>(x.stage||"novo")===stage);
         count.textContent=items.length;
+
         for(const l of items){
           const card=document.createElement("div");
-          card.className="kcard"; card.draggable=true; card.dataset.id=l.id; card.tabIndex=0;
-          const edit=document.createElement("button"); edit.type="button"; edit.className="edit-btn"; edit.title="Editar"; edit.innerHTML="✏️";
+          card.className="kcard";
+          card.draggable=true;
+          card.dataset.id=l.id;
+          card.tabIndex=0;
+
+          const edit=document.createElement("button");
+          edit.type="button"; edit.className="edit-btn"; edit.title="Editar lead"; edit.innerHTML="✏️";
           edit.addEventListener("click",(ev)=>{ ev.stopPropagation(); openEditForLead(l); });
           card.appendChild(edit);
+
           const nameEl=document.createElement("div"); nameEl.className="name"; nameEl.textContent=l.name||"";
           const metaEmail=document.createElement("div"); metaEmail.className="meta"; metaEmail.textContent=l.email||"";
           card.appendChild(nameEl); card.appendChild(metaEmail);
@@ -566,81 +663,141 @@
             const a=document.createElement("a");
             a.className="wa-icon";
             a.href=`https://wa.me/${wa}?text=${encodeURIComponent(buildMessage(waTemplate, l))}`;
-            a.target="_blank"; a.rel="noopener"; a.title="WhatsApp";
+            a.target="_blank"; a.rel="noopener"; a.title="Abrir WhatsApp";
             a.addEventListener("click", ev=>ev.stopPropagation());
-            a.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M16 0a16 16 0 1 0 0 32 16 16 0 0 0 0-32z" fill="#25D366"/><path d="M22.7 18.6c-.2.7-1.2 1.3-1.9 1.4-.5.1-1.1.2-1.9 0-.4-.1-1-.3-2-.7-3.6-1.6-5.9-5.2-6.1-5.5-.2-.3-1.5-2-1.5-3.8 0-1.9 1-2.7 1.3-3 .3-.3.7-.4 1-.4h.7c.2 0 .6 0 .9.7.3.7 1.1 2.6 1.2 2.8.1.2.1.4 0 .6-.1.3-.2.4-.4.7-.2.2-.4.5-.5.7-.2.2-.4.5-.2.8.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.6.1.8-.1.2-.2 1-.9 1.2-1.2.3-.3.5-.2.8-.1.3.1 1.9.9 2.2 1.1.3.2.5.3.6.5.1.2.1.6 0 .9z" fill="#fff"/></svg>`;
+            a.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16 0a16 16 0 1 0 0 32 16 16 0 0 0 0-32z" fill="#25D366"/><path d="M22.7 18.6c-.2.7-1.2 1.3-1.9 1.4-.5.1-1.1.2-1.9 0-.4-.1-1-.3-2-.7-3.6-1.6-5.9-5.2-6.1-5.5-.2-.3-1.5-2-1.5-3.8 0-1.9 1-2.7 1.3-3 .3-.3.7-.4 1-.4h.7c.2 0 .6 0 .9.7.3.7 1.1 2.6 1.2 2.8.1.2.1.4 0 .6-.1.3-.2.4-.4.7-.2.2-.4.5-.5.7-.2.2-.4.5-.2.8.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.6.1.8-.1.2-.2 1-.9 1.2-1.2.3-.3.5-.2.8-.1.3.1 1.9.9 2.2 1.1.3.2.5.3.6.5.1.2.1.6 0 .9z" fill="#fff"/></svg>`;
             card.appendChild(a);
           }
-          const handle=document.createElement("div"); handle.className="drag-handle"; handle.title="Arrastar para outra coluna"; handle.textContent="⠿"; card.appendChild(handle);
+
+          const handle=document.createElement("div");
+          handle.className="drag-handle"; handle.title="Arrastar para outra coluna"; handle.textContent="⠿";
+          card.appendChild(handle);
+
           card.addEventListener("click", ()=> showLeadDetails(l));
-          card.addEventListener("keydown", (ev)=>{ if(ev.key==="Enter") showLeadDetails(l); });
-          // DnD
+          card.addEventListener("dblclick", (ev)=>{ ev.preventDefault(); openEditForLead(l); });
+          card.addEventListener("keydown", (ev)=>{
+            if(ev.key==="Enter") showLeadDetails(l);
+            if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="e"){ ev.preventDefault(); openEditForLead(l); }
+          });
+
+          // Arrastar por qualquer parte do card
           card.addEventListener("dragstart", e=>{
             const id = card.dataset.id;
-            if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try{ e.dataTransfer.setData("text/plain", id);}catch(_){} }
+            if (e.dataTransfer) {
+              e.dataTransfer.effectAllowed = "move";
+              try { e.dataTransfer.setData("text/plain", id); } catch(_) {}
+            }
             card.classList.add("dragging");
           });
-          card.addEventListener("dragend", ()=> card.classList.remove("dragging"));
+          card.addEventListener("dragend", ()=>{
+            card.classList.remove("dragging");
+          });
+
           body.appendChild(card);
         }
       }
+      bindDnD();
+    }
+
+    function bindDnD(){
       document.querySelectorAll(".kbody").forEach(col=>{
-        col.addEventListener("dragover", e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="move"; col.classList.add("kdrop"); });
-        col.addEventListener("dragleave", ()=> col.classList.remove("kdrop"));
+        col.addEventListener("dragover", e=>{
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+          col.classList.add("kdrop");
+        });
+        col.addEventListener("dragleave", ()=>col.classList.remove("kdrop"));
         col.addEventListener("drop", e=>{
           e.preventDefault(); col.classList.remove("kdrop");
-          const dragged=document.querySelector(".kcard.dragging");
-          const id=(e.dataTransfer && e.dataTransfer.getData("text/plain")) || dragged?.dataset.id;
-          if(!id) return;
-          const l=leads.find(x=>x.id===id);
-          if(l){ const toStage=col.closest(".kcol")?.dataset.stage || col.parentElement.dataset.stage;
-            l.stage=toStage; l.updatedAt=Date.now(); persist(); renderAll(); }
+          const dragged = document.querySelector(".kcard.dragging");
+          const id = (e.dataTransfer && e.dataTransfer.getData("text/plain")) || dragged?.dataset.id;
+          if (!id) return;
+          const l = leads.find(x=>x.id===id);
+          if(l){
+            const toStage = col.closest(".kcol")?.dataset.stage || col.parentElement.dataset.stage;
+            l.stage=toStage; l.updatedAt=Date.now();
+            if(persist()){ setStatus("Lead movido ✅","ok"); pxTrack('kanban_move', { to: toStage }); }
+            renderAll();
+          }
         });
       });
     }
 
     /* ===== Dashboard ===== */
-    const pct=(p,t)=> t? Math.round((p/t)*100):0;
     function computeStats(){
-      const total=leads.length;
-      const vendidos=leads.filter(l=>l.stage==="vendido").length;
-      const byStage={novo:0,qualificado:0,proposta:0,vendido:0,perdido:0};
-      leads.forEach(l=>{byStage[l.stage||"novo"]=(byStage[l.stage||"novo"]||0)+1;});
-      const byQualif={quente:0,morno:0,frio:0,vazio:0};
-      leads.forEach(l=>{ if(!l.qualif) byQualif.vazio++; else byQualif[l.qualif]=(byQualif[l.qualif]||0)+1;});
-      const byOwner={};
-      leads.forEach(l=>{const o=l.owner||"(sem atendente)"; if(!byOwner[o]) byOwner[o]={total:0,vendido:0}; byOwner[o].total++; if(l.stage==="vendido") byOwner[o].vendido++;});
-      return {total,vendidos,conv: total?Math.round((vendidos/total)*100):0,byStage,byQualif,byOwner};
+      const total = leads.length;
+      const vendidos = leads.filter(l=>l.stage==="vendido").length;
+      const conv = total? Math.round((vendidos/total)*100) : 0;
+
+      const byStage = {novo:0, qualificado:0, proposta:0, vendido:0, perdido:0};
+      leads.forEach(l=>{ byStage[l.stage||"novo"] = (byStage[l.stage||"novo"]||0)+1; });
+
+      const byQualif = {quente:0, morno:0, frio:0, vazio:0};
+      leads.forEach(l=>{
+        if(!l.qualif) byQualif.vazio++;
+        else byQualif[l.qualif] = (byQualif[l.qualif]||0)+1;
+      });
+
+      const byOwner = {};
+      leads.forEach(l=>{
+        const o = l.owner||"(sem atendente)";
+        if(!byOwner[o]) byOwner[o] = {total:0, vendido:0};
+        byOwner[o].total++;
+        if(l.stage==="vendido") byOwner[o].vendido++;
+      });
+
+      return {total, vendidos, conv, byStage, byQualif, byOwner};
     }
+    function pct(part, whole){ return whole? Math.round((part/whole)*100) : 0; }
     function renderDashboard(){
-      const {total,vendidos,conv,byStage,byQualif,byOwner}=computeStats();
-      document.getElementById("kpiTotal").textContent=total;
-      document.getElementById("kpiVendido").textContent=vendidos;
-      document.getElementById("kpiConv").textContent=conv+"%";
-      const ds=document.getElementById("dashStages"); ds.innerHTML="";
-      [["Novo","novo"],["Qualificado","qualificado"],["Proposta","proposta"],["Vendido","vendido"],["Perdido","perdido"]].forEach(([label,key])=>{
-        const v = byStage[key]||0; const row=document.createElement("div"); row.className="row";
-        row.innerHTML=`<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`; ds.appendChild(row);
+      const {total, vendidos, conv, byStage, byQualif, byOwner} = computeStats();
+
+      document.getElementById("kpiTotal").textContent = total;
+      document.getElementById("kpiVendido").textContent = vendidos;
+      document.getElementById("kpiConv").textContent = conv + "%";
+
+      const ds = document.getElementById("dashStages"); ds.innerHTML="";
+      [["Novo","novo"],["Qualificado","qualificado"],["Proposta","proposta"],["Vendido","vendido"],["Perdido","perdido"]]
+      .forEach(([label,key])=>{
+        const v = byStage[key]||0;
+        const row = document.createElement("div"); row.className="row";
+        row.innerHTML = `<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`;
+        ds.appendChild(row);
       });
-      const dq=document.getElementById("dashQualif"); dq.innerHTML="";
-      [["Led Quente","quente"],["Led Morno","morno"],["Led Frio","frio"],["(Sem)","vazio"]].forEach(([label,key])=>{
-        const v=byQualif[key]||0; const row=document.createElement("div"); row.className="row";
-        row.innerHTML=`<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`; dq.appendChild(row);
+
+      const dq = document.getElementById("dashQualif"); dq.innerHTML="";
+      [["Led Quente","quente"],["Led Morno","morno"],["Led Frio","frio"],["(Sem)","vazio"]]
+      .forEach(([label,key])=>{
+        const v = byQualif[key]||0;
+        const row = document.createElement("div"); row.className="row";
+        row.innerHTML = `<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`;
+        dq.appendChild(row);
       });
-      const tb=document.querySelector("#dashOwners tbody"); tb.innerHTML="";
+
+      const tb = document.querySelector("#dashOwners tbody"); tb.innerHTML="";
       Object.entries(byOwner).sort((a,b)=>b[1].total-a[1].total).forEach(([owner,vals])=>{
-        const tr=document.createElement("tr"); tr.innerHTML=`<td>${esc(owner)}</td><td>${vals.total}</td><td>${vals.vendido}</td>`; tb.appendChild(tr);
+        const tr=document.createElement("tr");
+        tr.innerHTML = `<td>${esc(owner)}</td><td>${vals.total}</td><td>${vals.vendido}</td>`;
+        tb.appendChild(tr);
       });
     }
 
     /* ===== Export CSV ===== */
     function toCsvRow(arr){return arr.map(v=>('"'+String(v??"").replace(/"/g,'""')+'"')).join(",");}
-    function downloadCsv(filename, csv){ const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
-    document.getElementById("exportCsv").addEventListener("click", ()=>{
+    function downloadCsv(filename, csv){
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+    exportBtn.addEventListener("click", ()=>{
       const headers=["id","nome","email","whatsapp","atendente","estagio","origem","data","qualificacao","notas","criado_em","atualizado_em"];
       const rows=[headers];
-      const ownerFilter=fOwner?.value||""; const qualFilter=fQualif?.value||""; const q=(search?.value||"").toLowerCase();
+      const ownerFilter=fOwner?.value||"";
+      const qualFilter=fQualif?.value||"";
+      const q=(search?.value||"").toLowerCase();
       const sTs=parseDateTs(fStart?.value); const eTs=parseDateTs(fEnd?.value,true);
+
       const filtered=leads.filter(l=>{
         const txt=((l.name||"")+" "+(l.email||"")+" "+(l.phone||"")+" "+(l.owner||"")+" "+(l.source||"")+" "+(l.notes||"")+" "+qualName(l.qualif)).toLowerCase();
         const d=l.date?parseDateTs(l.date):l.updatedAt;
@@ -651,60 +808,75 @@
         if(eTs && d>eTs) return false;
         return true;
       });
+
       for(const l of filtered){
-        rows.push([l.id,l.name||"",l.email||"",l.phone||"",l.owner||"",l.stage||"",l.source||"",l.date||"",qualName(l.qualif)||"",l.notes||"",new Date(l.createdAt).toISOString(),new Date(l.updatedAt).toISOString()]);
+        rows.push([l.id,l.name||"",l.email||"",l.phone||"",l.owner||"",
+          l.stage||"",l.source||"",l.date||"",qualName(l.qualif)||"",
+          l.notes||"",new Date(l.createdAt).toISOString(),new Date(l.updatedAt).toISOString()]);
       }
-      const csv=rows.map(toCsvRow).join("\n");
-      downloadCsv(`leads_${(currentEmail||"user").replace(/[^a-z0-9]+/gi,'_')}_${new Date().toISOString().slice(0,10)}.csv`, csv);
+      const csv = rows.map(toCsvRow).join("\n");
+      downloadCsv(`leads_pixelup_${new Date().toISOString().slice(0,10)}.csv`, csv);
     });
 
     /* ===== Form ===== */
-    const uid=()=> (Date.now().toString(36)+Math.random().toString(36).slice(2,6)).toUpperCase();
-    const persist=()=> safeSetJSON(LS_KEY, leads);
-    document.getElementById("leadForm").addEventListener("submit",(e)=>{
-      e.preventDefault();
-      const lead={id:uid(),
-        name:document.getElementById("name").value.trim(),
-        email:document.getElementById("email").value.trim(),
-        phone:document.getElementById("phone").value.trim(),
-        stage:document.getElementById("stage").value,
-        owner:document.getElementById("owner").value.trim(),
-        source:document.getElementById("source").value.trim(),
-        date:document.getElementById("date").value,
-        qualif:document.getElementById("qualif").value,
-        notes:document.getElementById("notes").value.trim(),
-        createdAt:Date.now(), updatedAt:Date.now()
-      };
-      if(!lead.name){ alert("Informe o nome"); return; }
-      leads.push(lead); persist(); e.target.reset(); renderAll();
+    const uid = () => (Date.now().toString(36) + Math.random().toString(36).slice(2,6)).toUpperCase();
+    if(form){
+      form.addEventListener("submit", e=>{
+        e.preventDefault();
+        const lead={id:uid(),
+          name:document.getElementById("name").value.trim(),
+          email:document.getElementById("email").value.trim(),
+          phone:document.getElementById("phone").value.trim(),
+          stage:document.getElementById("stage").value,
+          owner:document.getElementById("owner").value.trim(),
+          source:document.getElementById("source").value.trim(),
+          date:document.getElementById("date").value,
+          qualif:document.getElementById("qualif").value,
+          notes:document.getElementById("notes").value.trim(),
+          createdAt:Date.now(),updatedAt:Date.now()};
+        if(!lead.name){alert("Informe o nome");return;}
+        leads.push(lead);
+        if(persist()){
+          setStatus(`Lead salvo ✅ (armazenamento: ${storeType})`,"ok");
+          pxTrack('lead_save', { stage: lead.stage || 'novo' });
+          form.reset();
+          renderAll();
+        }
+      });
+    }
+
+    /* ===== Template WhatsApp ===== */
+    btnTemplate.addEventListener("click", ()=>{
+      const novo = prompt("Edite o texto padrão do WhatsApp.\nPlaceholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}", waTemplate);
+      if(novo!=null){
+        waTemplate=novo;
+        try{ store.setItem(WA_TPL_KEY, waTemplate); setStatus("Modelo de WhatsApp salvo ✅","ok"); }
+        catch(e){ setStatus("Erro ao salvar modelo","err"); }
+      }
     });
 
     /* ===== Abas ===== */
-    const dashboard=document.getElementById("dashboard");
-    const tableWrap=document.getElementById("tableWrap");
-    const kanbanEl=document.getElementById("kanban");
-    document.getElementById("tabDashboard").onclick=()=>{ tab("dashboard"); };
-    document.getElementById("tabList").onclick=()=>{ tab("list"); };
-    document.getElementById("tabKanban").onclick=()=>{ tab("kanban"); };
-    function tab(which){
-      document.querySelectorAll(".view-switch .tab").forEach(b=>b.classList.remove("active"));
-      if(which==="dashboard"){
-        document.getElementById("tabDashboard").classList.add("active");
-        dashboard.style.display="block"; tableWrap.style.display="none"; kanbanEl.style.display="none"; kanbanEl.classList.remove("visible"); renderDashboard();
-      }else if(which==="kanban"){
-        document.getElementById("tabKanban").classList.add("active");
-        kanbanEl.style.display="grid"; kanbanEl.classList.add("visible"); dashboard.style.display="none"; tableWrap.style.display="none"; renderKanban();
-      }else{
-        document.getElementById("tabList").classList.add("active");
-        tableWrap.style.display="block"; dashboard.style.display="none"; kanbanEl.style.display="none"; kanbanEl.classList.remove("visible");
-      }
-    }
-    ;[document.getElementById("search"),document.getElementById("filterOwner"),document.getElementById("filterQualif"),document.getElementById("filterStart"),document.getElementById("filterEnd")]
-     .forEach(el=>el&&el.addEventListener("input",()=>{ renderList(); renderDashboard(); }));
+    tabDashboard.onclick=()=>{
+      tabDashboard.classList.add("active"); tabList.classList.remove("active"); tabKanban.classList.remove("active");
+      dashboard.style.display="block"; tableWrap.style.display="none"; kanbanEl.classList.remove("visible"); kanbanEl.style.display="none";
+      renderDashboard();
+    };
+    tabList.onclick=()=>{
+      tabList.classList.add("active"); tabDashboard.classList.remove("active"); tabKanban.classList.remove("active");
+      tableWrap.style.display="block"; dashboard.style.display="none"; kanbanEl.classList.remove("visible"); kanbanEl.style.display="none";
+    };
+    tabKanban.onclick=()=>{
+      tabKanban.classList.add("active"); tabList.classList.remove("active"); tabDashboard.classList.remove("active");
+      kanbanEl.style.display="grid"; kanbanEl.classList.add("visible");
+      dashboard.style.display="none"; tableWrap.style.display="none";
+      renderKanban();
+    };
 
-    function renderAll(){ renderList(); renderKanban(); renderDashboard(); }
+    [search,fOwner,fQualif,fStart,fEnd].forEach(el=>el&&el.addEventListener("input",()=>{renderList(); renderDashboard();}));
 
-    /* ====== Ciclo de autenticação ====== */
-    function keyFor(email){ return (email||"").toLowerCase().replace(/[^a-z0-9]+/g,'_'); }
-    function loadFor(email){
-      currentEmail =
+    function renderAll(){renderList();renderKanban();renderDashboard();}
+    renderAll();
+  });
+  </script>
+</body>
+</html>
