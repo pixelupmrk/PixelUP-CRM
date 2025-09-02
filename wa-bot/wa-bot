@@ -1,3 +1,159 @@
+const openWaBot = dlg.querySelector("#openWaBot");
+openWaBot?.addEventListener("click", async ()=>{
+  const num = (lead.phone||'').replace(/\D/g,'');
+  if(!num){ alert("Este lead não tem WhatsApp válido."); return; }
+  const text = waText.value || buildMessage(waTemplate, lead);
+  try{
+    const r = await fetch((window.BOT_API_URL||'') + '/send', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-api-key': window.BOT_API_KEY||'' },
+      body: JSON.stringify({ to: num, text })
+    });
+    if(!r.ok){ const t=await r.text(); throw new Error(t); }
+    alert('Enviado pelo bot ✅');
+    pxTrack?.('wa_send_bot');
+  }catch(e){
+    console.error(e);
+    alert('Falha ao enviar pelo bot');
+  }
+});
+<div class="wa-row">
+  <select id="waPreset">
+    <option value="">Selecione um modelo rápido…</option>
+    <option value="oi">Oi + apresentação</option>
+    <option value="proposta">Envio de proposta</option>
+    <option value="follow">Follow-up</option>
+  </select>
+  <button class="btn ghost" id="useDefault">Usar padrão</button>
+  <button class="btn" id="openWa">Abrir no WhatsApp</button>
+  <!-- NOVO: envio via BOT -->
+  <button class="btn" id="openWaBot">Enviar pelo Bot</button>
+</div>
+<script>
+  // CONFIG do Bot não-oficial
+  window.BOT_API_URL = 'http://SEU_SERVIDOR:3000'; // ex.: http://192.168.0.10:3000
+  window.BOT_API_KEY = 'A_MESMA_CHAVE_DO_BOT_API_KEY_DO_.env';
+</script>
+1) npm install
+2) cp .env.example .env  -> preencha OPENAI_API_KEY, BOT_API_KEY, ALLOWED_ORIGIN
+3) node server.js
+   - Escaneie o QR no terminal (WhatsApp > Dispositivos conectados > Conectar)
+4) Teste:
+   curl -X POST http://localhost:3000/send \
+     -H "Content-Type: application/json" \
+     -H "x-api-key: SUA_CHAVE" \
+     -d '{"to":"5511999999999","text":"Olá do bot!"}'
+5) Produção (opcional): pm2 start ecosystem.config.js --name wa-bot
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const qrcode = require('qrcode');
+const qrcodeTerm = require('qrcode-terminal');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+
+const PORT = process.env.PORT || 3000;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const BOT_API_KEY = process.env.BOT_API_KEY || '';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+const BOT_NAME = process.env.BOT_NAME || 'PixelUp Bot';
+
+if (!OPENAI_API_KEY) { console.error('❌ Defina OPENAI_API_KEY no .env'); process.exit(1); }
+
+async function askAI(userText) {
+  try {
+    const systemPrompt = `
+Você é ${BOT_NAME}, atendente da PixelUp no WhatsApp.
+Fale em PT-BR, seja simpático(a) e objetivo(a).
+Faça UMA pergunta de qualificação por vez (nome, necessidade, orçamento, prazo).
+Convide para agendar call ou receber proposta quando fizer sentido.
+Se o usuário pedir para parar, encerre educadamente.
+`.trim();
+
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.6,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: String(userText||'').trim() }]
+      })
+    });
+    const data = await r.json();
+    return data?.choices?.[0]?.message?.content?.trim() || 'Oi! Sou a assistente da PixelUp. Como posso te ajudar?';
+  } catch {
+    return 'Tive um probleminha aqui 😅. Pode repetir, por favor?';
+  }
+}
+
+function toWaId(num){ const d=String(num||'').replace(/\D/g,''); return d? (d.endsWith('@c.us')? d : `${d}@c.us`) : null; }
+
+let lastQr=null, ready=false;
+const client=new Client({ authStrategy:new LocalAuth({ clientId:'pixelup-crm' }),
+  puppeteer:{ headless:true, args:['--no-sandbox','--disable-setuid-sandbox'] } });
+
+client.on('qr', qr=>{ lastQr=qr; console.log('\nEscaneie o QR:'); qrcodeTerm.generate(qr,{small:true}); });
+client.on('authenticated', ()=>console.log('✅ Autenticado'));
+client.on('ready', ()=>{ ready=true; console.log('✅ WhatsApp pronto'); });
+client.on('auth_failure', m=>console.log('❌ Falha de auth:', m));
+client.on('disconnected', r=>{ ready=false; console.log('⚠️ Desconectado:', r, ' — reiniciando...'); setTimeout(()=>client.initialize(),5000); });
+
+client.on('message', async msg=>{
+  try{
+    if (msg.fromMe || msg.isGroupMsg) return;
+    const text=msg.body||''; if(!text.trim()) return;
+    const reply=await askAI(text); await client.sendMessage(msg.from, reply);
+  }catch(e){ console.error('Erro msg:',e); }
+});
+
+client.initialize();
+
+const app=express();
+app.use(express.json({limit:'1mb'}));
+app.use(cors({ origin: ALLOWED_ORIGIN==='*'? true : ALLOWED_ORIGIN }));
+
+app.get('/health',(req,res)=>res.json({ ok:true, state:ready?'READY':'NOT_READY' }));
+app.get('/qr', async (req,res)=>{ if(!lastQr) return res.status(404).json({error:'no_qr'});
+  const dataUrl=await qrcode.toDataURL(lastQr,{scale:6, errorCorrectionLevel:'M'}); res.json({dataUrl}); });
+app.get('/status', async (req,res)=>{ let state='UNKNOWN'; try{ state=await client.getState(); }catch{ state='DISCONNECTED'; }
+  res.json({ ok:true, state, ready }); });
+
+function requireKey(req,res,next){ const key=req.headers['x-api-key']||req.query.key;
+  if(!BOT_API_KEY) return res.status(500).json({error:'bot_api_key_not_set'});
+  if(key!==BOT_API_KEY) return res.status(401).json({error:'unauthorized'}); next(); }
+
+app.post('/send', requireKey, async (req,res)=>{
+  try{
+    const { to, text } = req.body||{};
+    if(!to||!text) return res.status(400).json({error:'Campos obrigatórios: to, text'});
+    const waId=toWaId(to); if(!waId) return res.status(400).json({error:'numero_invalido'});
+    await client.sendMessage(waId, String(text).slice(0,4096));
+    res.json({ok:true});
+  }catch(e){ console.error('Erro /send:',e); res.status(500).json({error:'server_error'}); }
+});
+
+app.post('/broadcast', requireKey, async (req,res)=>{
+  try{
+    const { numbers, text } = req.body||{};
+    if(!Array.isArray(numbers)||!numbers.length||!text) return res.status(400).json({error:'numbers(array) e text obrigatórios'});
+    const ok=[], fail=[];
+    for(const n of numbers){
+      const waId=toWaId(n); if(!waId){ fail.push(n); continue; }
+      try{ await client.sendMessage(waId, String(text).slice(0,4096)); ok.push(n); }catch{ fail.push(n); }
+      await new Promise(r=>setTimeout(r,400));
+    }
+    res.json({ ok:true, sent:ok.length, failed:fail.length, fail });
+  }catch(e){ console.error('Erro /broadcast:',e); res.status(500).json({error:'server_error'}); }
+});
+
+app.listen(PORT, ()=>console.log(`HTTP API em http://localhost:${PORT}  |  GET /qr  POST /send`));
+module.exports = {
+  apps: [{ name: 'wa-bot', script: 'server.js', watch: false, env: { NODE_ENV: 'production' } }]
+};
+PORT=3000
+OPENAI_API_KEY=COLE_SUA_CHAVE_DA_IA_AQUI
+BOT_API_KEY=GERA_UMA_SENHA_FORTE_AQUI
+ALLOWED_ORIGIN=http://localhost:5173
+BOT_NAME=PixelUp Bot
 {
   "name": "pixelup-wa-bot",
   "version": "1.0.0",
