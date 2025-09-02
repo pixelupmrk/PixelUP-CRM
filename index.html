@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CRM PixelUp — Dashboard + Lista + Kanban + Login</title>
 
+  <!-- ===== CONFIG DO BOT (NÃO-OFICIAL) ===== -->
+  <script>
+    // altere para o endereço do seu bot e a mesma chave do .env (BOT_API_KEY)
+    window.BOT_API_URL = 'http://SEU_SERVIDOR:3000';
+    window.BOT_API_KEY = 'SUA_CHAVE_DO_BOT_AQUI';
+  </script>
+
   <!-- Telemetria simples (opcional) -->
   <script>
     (function () {
@@ -14,7 +21,7 @@
       if (cidFromUrl) localStorage.setItem(CID_KEY, cidFromUrl);
 
       window.CLIENT_ID   = localStorage.getItem(CID_KEY) || 'CLIENTE-DEMO';
-      window.APP_VERSION = '1.1.3';
+      window.APP_VERSION = '1.1.4';
 
       const DEFAULT_WEBHOOK_URL = '';
       const whFromUrl = q.get('wh');
@@ -298,7 +305,7 @@
     </section>
   </main>
 
-  <!-- ===== SCRIPT DO CRM (Lista + Kanban + Persistência) ===== -->
+  <!-- ===== SCRIPT DO CRM ===== -->
   <script>
   document.addEventListener("DOMContentLoaded", function(){
     pxTrack('app_open'); setInterval(()=>pxTrack('heartbeat'), 15*60*1000);
@@ -329,7 +336,7 @@
       catch(e2){ storeType="memory"; setStatus("Erro: armazenamento bloqueado (somente memória).","err"); } }
     })();
 
-    // CHAVES por usuário (vindas do script de Auth; fallback guest)
+    // CHAVES por usuário (do Auth)
     const __getLSKey  = () => (window.getLSKey ? window.getLSKey() : "pixelup_crm_leads_v1_guest");
     const __getTplKey = () => (window.getTplKey ? window.getTplKey() : "pixelup_crm_wa_template_v1_guest");
 
@@ -353,7 +360,7 @@
     if(changed) safeSetJSON(__getLSKey(), leads);
     const persist=()=>safeSetJSON(__getLSKey(), leads);
 
-    const esc = s => String(s||"").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;","<":">","\"":"&quot;","'":"&#39;"}[m]) || m);
+    const esc = s => String(s||"").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
     const digits = s => String(s||"").replace(/\D/g,'');
     function parseDateTs(str,end){if(!str)return null;let y,m,d;if(str.includes("-")){const p=str.split("-");y=+p[0];m=+p[1]-1;d=+p[2];}else if(str.includes("/")){const p=str.split("/");d=+p[0];m=+p[1]-1;y=+p[2];}else return null;return new Date(y,m,d,end?23:0,end?59:0,end?59:0,end?999:0).getTime();}
     const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":"";
@@ -422,6 +429,8 @@
             </select>
             <button class="btn ghost" id="useDefault">Usar padrão</button>
             <button class="btn" id="openWa">Abrir no WhatsApp</button>
+            <!-- NOVO: envio via BOT não-oficial -->
+            <button class="btn" id="openWaBot">Enviar pelo Bot</button>
           </div>
           <textarea id="waText" placeholder="Mensagem que será enviada no WhatsApp"></textarea>
           <small>Placeholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}</small>
@@ -469,6 +478,7 @@
       const preset = dlg.querySelector("#waPreset");
       const useDefault = dlg.querySelector("#useDefault");
       const openWa = dlg.querySelector("#openWa");
+      const openWaBot = dlg.querySelector("#openWaBot");
       const quicks = {
         oi: "Olá {{nome}}, tudo bem? Aqui é {{atendente}} da PixelUp ({{qualificacao}}). Recebemos seu contato via {{origem}} 🙂",
         proposta: "Oi {{nome}}! Enviei a proposta no seu e-mail {{email}} ({{qualificacao}}). Se preferir, resumo por aqui.",
@@ -483,6 +493,24 @@
         const text = encodeURIComponent(waText.value || buildMessage(waTemplate, lead));
         window.open(`https://wa.me/${num}?text=${text}`, "_blank");
         pxTrack('open_whatsapp');
+      });
+      // Enviar pelo BOT não-oficial
+      openWaBot?.addEventListener("click", async ()=>{
+        const num = digits(lead.phone||""); if(!num){ alert("Este lead não tem WhatsApp válido."); return; }
+        const text = waText.value || buildMessage(waTemplate, lead);
+        try{
+          const r = await fetch((window.BOT_API_URL||'') + '/send', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'x-api-key': window.BOT_API_KEY||'' },
+            body: JSON.stringify({ to: num, text })
+          });
+          if(!r.ok){ const t=await r.text(); throw new Error(t); }
+          alert('Enviado pelo bot ✅');
+          pxTrack('wa_send_bot');
+        }catch(e){
+          console.error(e);
+          alert('Falha ao enviar pelo bot');
+        }
       });
 
       // Edição
