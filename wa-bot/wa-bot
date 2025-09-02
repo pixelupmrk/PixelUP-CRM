@@ -1,3 +1,5 @@
+npm install
+npm run start   # (ou: node server.js)
 PORT=3000
 BOT_API_KEY=MINHA_CHAVE_SECRETA_123
 ALLOWED_ORIGIN=*
