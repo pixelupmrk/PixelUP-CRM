@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CRM PixelUp — Dashboard + Lista + Kanban + Login</title>
 
-  <!-- Telemetria simples (webhook.site) — opcional -->
+  <!-- Telemetria simples (opcional) -->
   <script>
     (function () {
       const CID_KEY = 'px_client_id';
@@ -14,38 +14,26 @@
       if (cidFromUrl) localStorage.setItem(CID_KEY, cidFromUrl);
 
       window.CLIENT_ID   = localStorage.getItem(CID_KEY) || 'CLIENTE-DEMO';
-      window.APP_VERSION = '1.1.0'; // bump (auth + dnd + persist robusta)
+      window.APP_VERSION = '1.1.3';
 
       const DEFAULT_WEBHOOK_URL = '';
       const whFromUrl = q.get('wh');
       const whStored  = localStorage.getItem('px_webhook_url');
-
       if (whFromUrl) localStorage.setItem('px_webhook_url', decodeURIComponent(whFromUrl));
       window.WEBHOOK_URL = whFromUrl ? decodeURIComponent(whFromUrl) : (whStored || DEFAULT_WEBHOOK_URL);
 
       window.pxTrack = function (eventName, props) {
         try {
           if (!window.WEBHOOK_URL) return;
-          const payload = {
-            event: eventName,
-            client: window.CLIENT_ID,
-            version: window.APP_VERSION,
-            ts: new Date().toISOString(),
-            ...(props || {})
-          };
+          const payload = { event: eventName, client: window.CLIENT_ID, version: window.APP_VERSION, ts: new Date().toISOString(), ...(props||{}) };
           const body = JSON.stringify(payload);
-
           if (navigator.sendBeacon) {
             const blob = new Blob([body], { type: 'application/json' });
             navigator.sendBeacon(window.WEBHOOK_URL, blob);
           } else {
-            fetch(window.WEBHOOK_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body
-            }).catch(() => {});
+            fetch(window.WEBHOOK_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body }).catch(()=>{});
           }
-        } catch (_) {}
+        } catch(_) {}
       };
     })();
   </script>
@@ -106,7 +94,7 @@
 
     .kcard{position:relative;background:#0f2132;border:1px solid #17324a;border-radius:10px;padding:10px;cursor:grab;overflow:hidden}
     .kcard:active{cursor:grabbing}
-    .kcard.dragging{opacity:.8;} /* feedback enquanto arrasta */
+    .kcard.dragging{opacity:.8}
     .kdrop{outline:2px dashed #18a4ff;outline-offset:-6px}
     .kcard .name{font-weight:600;margin-bottom:2px}
     .kcard .meta{opacity:.8}
@@ -129,8 +117,7 @@
     .kcol[data-stage="vendido"] .khead .title{color:#34d399}
     .kcol[data-stage="perdido"] .khead .title{color:#f87171}
 
-    .wa-icon{position:absolute;top:6px;right:6px;z-index:50;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366;border:1px solid #0b1a27;box-shadow:0 2px 4px rgba(0,0,0,.4);transition:all .2s}
-    .wa-icon:hover{transform:scale(1.1)}
+    .wa-icon{position:absolute;top:6px;right:6px;z-index:50;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366;border:1px solid #0b1a27;box-shadow:0 2px 4px rgba(0,0,0,.4)}
     .wa-icon svg{width:14px;height:14px;display:block;fill:#fff}
 
     .edit-btn{
@@ -138,35 +125,26 @@
       background:#0f2132;border:1px solid #17324a;color:#cde9ff;
       border-radius:8px;padding:4px 6px;cursor:pointer;font-size:12px
     }
-    .edit-btn:hover{filter:brightness(1.1)}
 
     @media (max-width:1000px){.kanban.visible{grid-template-columns:repeat(2,1fr)}}
     @media (max-width:600px){.kanban.visible{grid-template-columns:1fr}}
 
-    /* ===== <dialog> como modal flutuante ===== */
+    /* Dialog */
     dialog.px-modal{
       width:min(94vw,640px);
       max-height:90vh;
-      border:none;
-      border-radius:14px;
-      padding:18px;
-      background:#0f2132;
-      color:#eaf6ff;
-      box-shadow:0 10px 40px rgba(0,0,0,.5);
+      border:none;border-radius:14px;padding:18px;
+      background:#0f2132;color:#eaf6ff;box-shadow:0 10px 40px rgba(0,0,0,.5);
       overflow:auto;
     }
-    dialog.px-modal::backdrop{
-      background:rgba(0,0,0,.6);
-      backdrop-filter:blur(1px);
-    }
-
+    dialog.px-modal::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(1px)}
     .modal-header{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap}
     .modal-header h3{margin:0;font-size:18px}
     .modal-actions{display:flex;gap:8px}
     .modal-close{background:transparent;border:1px solid #17324a;color:#cde9ff;border-radius:10px;padding:6px 10px;cursor:pointer}
     .dl{display:grid;grid-template-columns:140px 1fr;gap:8px;margin-top:8px}
     .dl b{color:#9fd9ff}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;opacity:.9}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;opacity:.9}
     .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .edit-grid textarea{grid-column:1/-1;min-height:100px}
     .wa-block{margin-top:12px;border-top:1px solid #17324a;padding-top:10px;display:grid;gap:8px}
@@ -196,12 +174,12 @@
 <body>
   <header class="topbar"><h1>CRM <span>PixelUp</span></h1></header>
 
-  <!-- TELA DE LOGIN -->
+  <!-- LOGIN -->
   <section id="authCard" class="card" style="max-width:420px;margin:24px auto;display:none">
     <h2>Acessar CRM</h2>
     <form id="authForm" class="form-grid" style="grid-template-columns:1fr">
       <input id="authEmail" type="email" placeholder="E-mail" required />
-      <input id="authPass" type="password" placeholder="Senha" required />
+      <input id="authPass" type="password" placeholder="Senha (mín. 6)" required minlength="6" autocomplete="new-password" />
       <button class="btn" type="submit">Entrar</button>
       <button class="btn ghost" type="button" id="btnRegister">Criar conta</button>
       <button class="btn ghost" type="button" id="btnForgot">Esqueci a senha</button>
@@ -209,7 +187,7 @@
     <div id="authMsg" class="status" style="margin-top:8px"></div>
   </section>
 
-  <!-- Barra do usuário (quando logado) -->
+  <!-- Barra usuário -->
   <div id="userBar" style="display:none;max-width:1200px;margin:0 auto;padding:0 16px">
     <div class="status ok" style="text-align:right">
       Logado como <b id="ubEmail"></b> • <button id="btnLogout" class="btn ghost" type="button">Sair</button>
@@ -320,74 +298,48 @@
     </section>
   </main>
 
-  <!-- ===== SCRIPT DO CRM (DnD corrigido + persistência robusta + chaves por usuário) ===== -->
+  <!-- ===== SCRIPT DO CRM (Lista + Kanban + Persistência) ===== -->
   <script>
   document.addEventListener("DOMContentLoaded", function(){
-    // Telemetria: abriu + heartbeat
-    pxTrack('app_open');
-    setInterval(() => pxTrack('heartbeat'), 15 * 60 * 1000);
+    pxTrack('app_open'); setInterval(()=>pxTrack('heartbeat'), 15*60*1000);
 
     const storageStatus = document.getElementById("storageStatus");
     function setStatus(msg, cls){ storageStatus.textContent = msg; storageStatus.className = "status " + (cls||""); }
 
-    /* ====== STORAGE ROBUSTO (espelha em local + session, com fallback memória) ====== */
+    // STORAGE robusto
     const memory = {};
-    function testStore(api){
-      const t="__px_test__";
-      api.setItem(t,"1"); api.removeItem(t);
-    }
     let storeType = "localStorage";
     const store = {
       getItem(k){
-        try{ const v = localStorage.getItem(k); if(v!=null) return v; }catch(_){}
-        try{ const v = sessionStorage.getItem(k); if(v!=null) return v; }catch(_){}
+        try{ const v=localStorage.getItem(k); if(v!=null) return v; }catch(_){}
+        try{ const v=sessionStorage.getItem(k); if(v!=null) return v; }catch(_){}
         return Object.prototype.hasOwnProperty.call(memory,k) ? memory[k] : null;
       },
       setItem(k,v){
         let ok=false;
         try{ localStorage.setItem(k,v); ok=true; }catch(_){}
         try{ sessionStorage.setItem(k,v); ok=true; if(!ok) storeType="sessionStorage"; }catch(_){}
-        if(!ok){ memory[k]=v; storeType="memory"; }
-        return ok;
+        if(!ok){ memory[k]=v; storeType="memory"; } return ok;
       },
-      removeItem(k){
-        try{ localStorage.removeItem(k); }catch(_){}
-        try{ sessionStorage.removeItem(k); }catch(_){}
-        delete memory[k];
-      }
+      removeItem(k){ try{localStorage.removeItem(k);}catch(_){} try{sessionStorage.removeItem(k);}catch(_){} delete memory[k]; }
     };
     (function initStorageStatus(){
-      try{ testStore(localStorage); storeType="localStorage"; setStatus("Armazenamento: localStorage ativo ✅","ok"); }
-      catch(e1){
-        try{ testStore(sessionStorage); storeType="sessionStorage"; setStatus("Aviso: usando sessionStorage (perde ao fechar o navegador).","warn"); }
-        catch(e2){ storeType="memory"; setStatus("Erro: armazenamento bloqueado. Dados não serão salvos após recarregar.","err"); }
-      }
+      try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); storeType="localStorage"; setStatus("Armazenamento: localStorage ativo ✅","ok"); }
+      catch(e1){ try{ sessionStorage.setItem("__t","1"); sessionStorage.removeItem("__t"); storeType="sessionStorage"; setStatus("Aviso: usando sessionStorage.","warn"); }
+      catch(e2){ storeType="memory"; setStatus("Erro: armazenamento bloqueado (somente memória).","err"); } }
     })();
 
-    // ===== CHAVES POR USUÁRIO (definidas pelo script de Auth; aqui com fallback "guest")
+    // CHAVES por usuário (vindas do script de Auth; fallback guest)
     const __getLSKey  = () => (window.getLSKey ? window.getLSKey() : "pixelup_crm_leads_v1_guest");
     const __getTplKey = () => (window.getTplKey ? window.getTplKey() : "pixelup_crm_wa_template_v1_guest");
 
-    function safeGetJSON(key, def){
-      try{ const v = store.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
-    }
-    function safeSetJSON(key, val){
-      try{
-        const s = JSON.stringify(val);
-        const ok = store.setItem(key, s);
-        if(!ok) throw new Error("Storage indisponível");
-        return true;
-      }catch(e){
-        console.warn("Persistência falhou:", e);
-        setStatus("Erro ao salvar (ver Console).","err");
-        return false;
-      }
-    }
+    function safeGetJSON(key, def){ try{const v=store.getItem(key);return v?JSON.parse(v):def;}catch(_){return def;} }
+    function safeSetJSON(key, val){ try{const s=JSON.stringify(val); const ok=store.setItem(key,s); if(!ok) throw 0; return true;}catch(_){ setStatus("Erro ao salvar (ver Console).","err"); return false; } }
 
-    let waTemplate = (store.getItem(__getTplKey()) || "Olá {{nome}}! Aqui é {{atendente}} da PixelUp. Vi seu contato via {{origem}} ({{qualificacao}}). Podemos falar?");
+    let waTemplate = store.getItem(__getTplKey()) || "Olá {{nome}}! Aqui é {{atendente}} da PixelUp. Vi seu contato via {{origem}} ({{qualificacao}}). Podemos falar?";
     let leads = safeGetJSON(__getLSKey(), []);
 
-    // migração simples (tags -> qualif)
+    // migração tags -> qualif
     let changed=false;
     for(const l of leads){
       if(!l.qualif && l.tags){
@@ -401,23 +353,13 @@
     if(changed) safeSetJSON(__getLSKey(), leads);
     const persist=()=>safeSetJSON(__getLSKey(), leads);
 
-    const esc = s => String(s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-    const digits = s => (String(s||"").replace(/\D/g,''));
+    const esc = s => String(s||"").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;","<":">","\"":"&quot;","'":"&#39;"}[m]) || m);
+    const digits = s => String(s||"").replace(/\D/g,'');
     function parseDateTs(str,end){if(!str)return null;let y,m,d;if(str.includes("-")){const p=str.split("-");y=+p[0];m=+p[1]-1;d=+p[2];}else if(str.includes("/")){const p=str.split("/");d=+p[0];m=+p[1]-1;y=+p[2];}else return null;return new Date(y,m,d,end?23:0,end?59:0,end?59:0,end?999:0).getTime();}
-    const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":""; // mantém texto original
+    const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":"";
     const qualClass = q => q?("q-"+q):"";
-
     function buildMessage(tpl, lead){
-      const map = {
-        "{{nome}}": lead.name||"",
-        "{{email}}": lead.email||"",
-        "{{whatsapp}}": lead.phone||"",
-        "{{atendente}}": lead.owner||"",
-        "{{origem}}": lead.source||"",
-        "{{estagio}}": lead.stage||"",
-        "{{data}}": lead.date||"",
-        "{{qualificacao}}": qualName(lead.qualif)||""
-      };
+      const map = {"{{nome}}":lead.name||"","{{email}}":lead.email||"","{{whatsapp}}":lead.phone||"","{{atendente}}":lead.owner||"","{{origem}}":lead.source||"","{{estagio}}":lead.stage||"","{{data}}":lead.date||"","{{qualificacao}}":qualName(lead.qualif)||""};
       let out=tpl; for(const k in map){ out=out.split(k).join(map[k]); } return out;
     }
 
@@ -437,7 +379,7 @@
     const tableWrap=document.getElementById("tableWrap");
     const kanbanEl=document.getElementById("kanban");
 
-    /* ===== Modal com <dialog> ===== */
+    /* ===== Modal (detalhes/editar) ===== */
     function showLeadDetails(lead){
       document.querySelectorAll("dialog.px-modal").forEach(d=>d.close());
 
@@ -448,69 +390,69 @@
       const dlg=document.createElement("dialog");
       dlg.className="px-modal";
       dlg.innerHTML=`
-          <div class="modal-header">
-            <h3>Detalhes do Lead</h3>
-            <div class="modal-actions">
-              <button class="btn ghost" id="editBtn">Editar</button>
-              <button class="modal-close" id="closeModalBtn">Fechar</button>
-            </div>
+        <div class="modal-header">
+          <h3>Detalhes do Lead</h3>
+          <div class="modal-actions">
+            <button class="btn ghost" id="editBtn">Editar</button>
+            <button class="modal-close" id="closeModalBtn">Fechar</button>
           </div>
+        </div>
 
-          <div id="detailsView" class="dl">
-            <b>Nome</b> <div>${esc(lead.name)}</div>
-            <b>E-mail</b> <div>${esc(lead.email||"")} &nbsp; ${mail}</div>
-            <b>WhatsApp</b> <div class="mono">${esc(lead.phone||"")} &nbsp; ${waLink}</div>
-            <b>Atendente</b> <div>${esc(lead.owner||"")}</div>
-            <b>Estágio</b> <div>${esc(lead.stage)}</div>
-            <b>Origem</b> <div>${esc(lead.source||"")}</div>
-            <b>Data</b> <div>${esc(lead.date||"")}</div>
-            <b>Qualificação</b> <div><span class="qual-badge ${qualClass(lead.qualif)}">${esc(qualName(lead.qualif))||"-"}</span></div>
-            <b>Criado</b> <div>${new Date(lead.createdAt).toLocaleString()}</div>
-            <b>Atualizado</b> <div>${new Date(lead.updatedAt).toLocaleString()}</div>
-            <b>Notas</b> <div style="white-space:pre-wrap">${esc(lead.notes||"-")}</div>
-          </div>
+        <div id="detailsView" class="dl">
+          <b>Nome</b> <div>${esc(lead.name)}</div>
+          <b>E-mail</b> <div>${esc(lead.email||"")} &nbsp; ${mail}</div>
+          <b>WhatsApp</b> <div class="mono">${esc(lead.phone||"")} &nbsp; ${waLink}</div>
+          <b>Atendente</b> <div>${esc(lead.owner||"")}</div>
+          <b>Estágio</b> <div>${esc(lead.stage)}</div>
+          <b>Origem</b> <div>${esc(lead.source||"")}</div>
+          <b>Data</b> <div>${esc(lead.date||"")}</div>
+          <b>Qualificação</b> <div><span class="qual-badge ${qualClass(lead.qualif)}">${esc(qualName(lead.qualif))||"-"}</span></div>
+          <b>Criado</b> <div>${new Date(lead.createdAt).toLocaleString()}</div>
+          <b>Atualizado</b> <div>${new Date(lead.updatedAt).toLocaleString()}</div>
+          <b>Notas</b> <div style="white-space:pre-wrap">${esc(lead.notes||"-")}</div>
+        </div>
 
-          <div class="wa-block">
-            <div class="wa-row">
-              <select id="waPreset">
-                <option value="">Selecione um modelo rápido…</option>
-                <option value="oi">Oi + apresentação</option>
-                <option value="proposta">Envio de proposta</option>
-                <option value="follow">Follow-up</option>
-              </select>
-              <button class="btn ghost" id="useDefault">Usar padrão</button>
-              <button class="btn" id="openWa">Abrir no WhatsApp</button>
-            </div>
-            <textarea id="waText" placeholder="Mensagem que será enviada no WhatsApp"></textarea>
-            <small>Placeholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}</small>
-          </div>
-
-          <form id="editForm" class="edit-grid" style="display:none;margin-top:8px">
-            <input  id="e_name"  placeholder="Nome" />
-            <input  id="e_email" placeholder="E-mail" />
-            <input  id="e_phone" placeholder="WhatsApp" />
-            <input  id="e_owner" placeholder="Atendente" />
-            <select id="e_stage">
-              <option value="novo">Novo</option>
-              <option value="qualificado">Qualificado</option>
-              <option value="proposta">Proposta</option>
-              <option value="vendido">Vendido</option>
-              <option value="perdido">Perdido</option>
+        <div class="wa-block">
+          <div class="wa-row">
+            <select id="waPreset">
+              <option value="">Selecione um modelo rápido…</option>
+              <option value="oi">Oi + apresentação</option>
+              <option value="proposta">Envio de proposta</option>
+              <option value="follow">Follow-up</option>
             </select>
-            <input  id="e_source" placeholder="Origem" />
-            <input  id="e_date"   type="date" />
-            <select id="e_qualif">
-              <option value="">Qualificação</option>
-              <option value="quente">Led Quente</option>
-              <option value="morno">Led Morno</option>
-              <option value="frio">Led Frio</option>
-            </select>
-            <textarea id="e_notes" placeholder="Notas"></textarea>
-            <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
-              <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
-              <button type="submit" class="btn">Salvar alterações</button>
-            </div>
-          </form>
+            <button class="btn ghost" id="useDefault">Usar padrão</button>
+            <button class="btn" id="openWa">Abrir no WhatsApp</button>
+          </div>
+          <textarea id="waText" placeholder="Mensagem que será enviada no WhatsApp"></textarea>
+          <small>Placeholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}</small>
+        </div>
+
+        <form id="editForm" class="edit-grid" style="display:none;margin-top:8px">
+          <input  id="e_name"  placeholder="Nome" />
+          <input  id="e_email" placeholder="E-mail" />
+          <input  id="e_phone" placeholder="WhatsApp" />
+          <input  id="e_owner" placeholder="Atendente" />
+          <select id="e_stage">
+            <option value="novo">Novo</option>
+            <option value="qualificado">Qualificado</option>
+            <option value="proposta">Proposta</option>
+            <option value="vendido">Vendido</option>
+            <option value="perdido">Perdido</option>
+          </select>
+          <input  id="e_source" placeholder="Origem" />
+          <input  id="e_date"   type="date" />
+          <select id="e_qualif">
+            <option value="">Qualificação</option>
+            <option value="quente">Led Quente</option>
+            <option value="morno">Led Morno</option>
+            <option value="frio">Led Frio</option>
+          </select>
+          <textarea id="e_notes" placeholder="Notas"></textarea>
+          <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
+            <button type="submit" class="btn">Salvar alterações</button>
+          </div>
+        </form>
       `;
 
       const close = ()=>{ dlg.close(); dlg.remove(); };
@@ -522,6 +464,7 @@
         if(!inBox) close();
       });
 
+      // WhatsApp
       const waText = dlg.querySelector("#waText");
       const preset = dlg.querySelector("#waPreset");
       const useDefault = dlg.querySelector("#useDefault");
@@ -542,6 +485,7 @@
         pxTrack('open_whatsapp');
       });
 
+      // Edição
       const details = dlg.querySelector("#detailsView");
       const formE = dlg.querySelector("#editForm");
       dlg.querySelector("#editBtn").addEventListener("click", ()=>{
@@ -649,10 +593,7 @@
     /* ===== KANBAN ===== */
     const STAGES=["novo","qualificado","proposta","vendido","perdido"];
 
-    function openEditForLead(lead){
-      showLeadDetails(lead);
-      setTimeout(()=>{ document.querySelector('dialog.px-modal #editBtn')?.click(); }, 0);
-    }
+    function openEditForLead(lead){ showLeadDetails(lead); setTimeout(()=>{ document.querySelector('dialog.px-modal #editBtn')?.click(); }, 0); }
 
     function renderKanban(){
       for(const stage of STAGES){
@@ -687,7 +628,7 @@
             a.href=`https://wa.me/${wa}?text=${encodeURIComponent(buildMessage(waTemplate, l))}`;
             a.target="_blank"; a.rel="noopener"; a.title="Abrir WhatsApp";
             a.addEventListener("click", ev=>ev.stopPropagation());
-            a.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16 0a16 16 0 1 0 0 32 16 16 0 0 0 0-32z" fill="#25D366"/><path d="M22.7 18.6c-.2.7-1.2 1.3-1.9 1.4-.5.1-1.1.2-1.9 0-.4-.1-1-.3-2-.7-3.6-1.6-5.9-5.2-6.1-5.5-.2-.3-1.5-2-1.5-3.8 0-1.9 1-2.7 1.3-3 .3-.3.7-.4 1-.4h.7c.2 0 .6 0 .9.7.3.7 1.1 2.6 1.2 2.8.1.2.1.4 0 .6-.1.3-.2.4-.4.7-.2.2-.4.5-.5.7-.2.2-.4.5-.2.8.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.6.1.8-.1.2-.2 1-.9 1.2-1.2.3-.3.5-.2.8-.1.3.1 1.9.9 2.2 1.1.3.2.5.3.6.5.1.2.1.6 0 .9z" fill="#fff"/></svg>`;
+            a.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16 0a16 16 0 1 0 0 32 16 16 0 0 0 0-32z" fill="#25D366"/><path d="M22.7 18.6c-.2.7-1.2 1.3-1.9 1.4-.5.1-1.1.2-1.9 0-.4-.1-1-.3-2-.7-3.6-1.6-5.9-5.2-6.1-5.5-.2-.3-1.5-2-1.5-3.8 0-1.9 1-2.7 1.3-3 .3-.3 .7-.4 1-.4h.7c.2 0 .6 0 .9.7.3.7 1.1 2.6 1.2 2.8.1.2.1.4 0 .6-.1.3-.2.4-.4.7-.2.2-.4.5-.5.7-.2.2-.4.5-.2.8.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.6.1.8-.1.2-.2 1-.9 1.2-1.2.3-.3.5-.2.8-.1.3.1 1.9.9 2.2 1.1.3.2.5.3.6.5.1.2.1.6 0 .9z" fill="#fff"/></svg>`;
             card.appendChild(a);
           }
 
@@ -702,18 +643,11 @@
             if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="e"){ ev.preventDefault(); openEditForLead(l); }
           });
 
-          // Arrastar por qualquer parte do card
           card.addEventListener("dragstart", e=>{
-            const id = card.dataset.id;
-            if (e.dataTransfer) {
-              e.dataTransfer.effectAllowed = "move";
-              try { e.dataTransfer.setData("text/plain", id); } catch(_) {}
-            }
+            if(e.dataTransfer){ e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", card.dataset.id); }catch(_){} }
             card.classList.add("dragging");
           });
-          card.addEventListener("dragend", ()=>{
-            card.classList.remove("dragging");
-          });
+          card.addEventListener("dragend", ()=> card.classList.remove("dragging"));
 
           body.appendChild(card);
         }
@@ -723,11 +657,7 @@
 
     function bindDnD(){
       document.querySelectorAll(".kbody").forEach(col=>{
-        col.addEventListener("dragover", e=>{
-          e.preventDefault();
-          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-          col.classList.add("kdrop");
-        });
+        col.addEventListener("dragover", e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="move"; col.classList.add("kdrop"); });
         col.addEventListener("dragleave", ()=>col.classList.remove("kdrop"));
         col.addEventListener("drop", e=>{
           e.preventDefault(); col.classList.remove("kdrop");
@@ -755,32 +685,26 @@
       leads.forEach(l=>{ byStage[l.stage||"novo"] = (byStage[l.stage||"novo"]||0)+1; });
 
       const byQualif = {quente:0, morno:0, frio:0, vazio:0};
-      leads.forEach(l=>{
-        if(!l.qualif) byQualif.vazio++;
-        else byQualif[l.qualif] = (byQualif[l.qualif]||0)+1;
-      });
+      leads.forEach(l=>{ if(!l.qualif) byQualif.vazio++; else byQualif[l.qualif] = (byQualif[l.qualif]||0)+1; });
 
       const byOwner = {};
       leads.forEach(l=>{
         const o = l.owner||"(sem atendente)";
         if(!byOwner[o]) byOwner[o] = {total:0, vendido:0};
-        byOwner[o].total++;
-        if(l.stage==="vendido") byOwner[o].vendido++;
+        byOwner[o].total++; if(l.stage==="vendido") byOwner[o].vendido++;
       });
 
       return {total, vendidos, conv, byStage, byQualif, byOwner};
     }
-    function pct(part, whole){ return whole? Math.round((part/whole)*100) : 0; }
+    const pct=(p,t)=> t? Math.round((p/t)*100) : 0;
     function renderDashboard(){
       const {total, vendidos, conv, byStage, byQualif, byOwner} = computeStats();
-
       document.getElementById("kpiTotal").textContent = total;
       document.getElementById("kpiVendido").textContent = vendidos;
       document.getElementById("kpiConv").textContent = conv + "%";
 
       const ds = document.getElementById("dashStages"); ds.innerHTML="";
-      [["Novo","novo"],["Qualificado","qualificado"],["Proposta","proposta"],["Vendido","vendido"],["Perdido","perdido"]]
-      .forEach(([label,key])=>{
+      [["Novo","novo"],["Qualificado","qualificado"],["Proposta","proposta"],["Vendido","vendido"],["Perdido","perdido"]].forEach(([label,key])=>{
         const v = byStage[key]||0;
         const row = document.createElement("div"); row.className="row";
         row.innerHTML = `<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`;
@@ -788,8 +712,7 @@
       });
 
       const dq = document.getElementById("dashQualif"); dq.innerHTML="";
-      [["Led Quente","quente"],["Led Morno","morno"],["Led Frio","frio"],["(Sem)","vazio"]]
-      .forEach(([label,key])=>{
+      [["Led Quente","quente"],["Led Morno","morno"],["Led Frio","frio"],["(Sem)","vazio"]].forEach(([label,key])=>{
         const v = byQualif[key]||0;
         const row = document.createElement("div"); row.className="row";
         row.innerHTML = `<div>${label}</div><div class="bar"><div style="width:${pct(v,total)}%"></div></div><div style="text-align:right">${v}</div>`;
@@ -812,7 +735,7 @@
       const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
     }
-    exportBtn.addEventListener("click", ()=>{
+    document.getElementById("exportCsv").addEventListener("click", ()=>{
       const headers=["id","nome","email","whatsapp","atendente","estagio","origem","data","qualificacao","notas","criado_em","atualizado_em"];
       const rows=[headers];
       const ownerFilter=fOwner?.value||"";
@@ -869,8 +792,7 @@
     }
 
     /* ===== Template WhatsApp ===== */
-    const btnTemplateEl=document.getElementById("btnTemplate");
-    btnTemplateEl.addEventListener("click", ()=>{
+    document.getElementById("btnTemplate").addEventListener("click", ()=>{
       const novo = prompt("Edite o texto padrão do WhatsApp.\nPlaceholders: {{nome}}, {{email}}, {{whatsapp}}, {{atendente}}, {{origem}}, {{estagio}}, {{data}}, {{qualificacao}}", waTemplate);
       if(novo!=null){
         waTemplate=novo;
@@ -880,42 +802,27 @@
     });
 
     /* ===== Abas ===== */
-    tabDashboard.onclick=()=>{
-      tabDashboard.classList.add("active"); tabList.classList.remove("active"); tabKanban.classList.remove("active");
-      dashboard.style.display="block"; tableWrap.style.display="none"; document.getElementById('kanban').classList.remove("visible"); document.getElementById('kanban').style.display="none";
-      renderDashboard();
-    };
-    tabList.onclick=()=>{
-      tabList.classList.add("active"); tabDashboard.classList.remove("active"); tabKanban.classList.remove("active");
-      tableWrap.style.display="block"; dashboard.style.display="none"; document.getElementById('kanban').classList.remove("visible"); document.getElementById('kanban').style.display="none";
-    };
-    tabKanban.onclick=()=>{
-      tabKanban.classList.add("active"); tabList.classList.remove("active"); tabDashboard.classList.remove("active");
-      const kb=document.getElementById('kanban');
-      kb.style.display="grid"; kb.classList.add("visible");
-      dashboard.style.display="none"; tableWrap.style.display="none";
-      renderKanban();
-    };
+    tabDashboard.onclick=()=>{ tabDashboard.classList.add("active"); tabList.classList.remove("active"); tabKanban.classList.remove("active");
+      dashboard.style.display="block"; tableWrap.style.display="none"; kanbanEl.classList.remove("visible"); kanbanEl.style.display="none"; renderDashboard(); };
+    tabList.onclick=()=>{ tabList.classList.add("active"); tabDashboard.classList.remove("active"); tabKanban.classList.remove("active");
+      tableWrap.style.display="block"; dashboard.style.display="none"; kanbanEl.classList.remove("visible"); kanbanEl.style.display="none"; };
+    tabKanban.onclick=()=>{ tabKanban.classList.add("active"); tabList.classList.remove("active"); tabDashboard.classList.remove("active");
+      kanbanEl.style.display="grid"; kanbanEl.classList.add("visible"); dashboard.style.display="none"; tableWrap.style.display="none"; renderKanban(); };
 
     [search,fOwner,fQualif,fStart,fEnd].forEach(el=>el&&el.addEventListener("input",()=>{renderList(); renderDashboard();}));
 
     function renderAll(){renderList();renderKanban();renderDashboard();}
     renderAll();
 
-    // Exposto para o script de Auth: recarregar dados quando usuário muda
+    // recarregar dados ao logar/sair
     window.__reloadUserData = function(){
-      try{
-        waTemplate = store.getItem(__getTplKey()) || waTemplate;
-        leads = safeGetJSON(__getLSKey(), []);
-        renderAll();
-      }catch(_){}
+      try{ waTemplate = store.getItem(__getTplKey()) || waTemplate; leads = safeGetJSON(__getLSKey(), []); renderAll(); }catch(_){}
     };
   });
   </script>
 
-  <!-- ===== SCRIPT DE AUTENTICAÇÃO (Firebase) ===== -->
+  <!-- ===== SCRIPT DE AUTENTICAÇÃO (Firebase via CDN) ===== -->
   <script type="module">
-    // Import com CDN oficial do Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAnalytics }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
     import {
@@ -925,7 +832,7 @@
       sendPasswordResetEmail, signOut
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // SUA CONFIG DO FIREBASE
+    // CONFIG DO SEU PROJETO
     const firebaseConfig = {
       apiKey: "AIzaSyDbH9A6GsgBwuROixn3auVSsYFVHc8wNok",
       authDomain: "crmpixelup.firebaseapp.com",
@@ -941,71 +848,72 @@
 
     const auth = getAuth(app);
 
-    // refs UI
-    const appEl      = document.getElementById('app');
-    const authCard   = document.getElementById('authCard');
-    const userBar    = document.getElementById('userBar');
-    const ubEmail    = document.getElementById('ubEmail');
-    const authForm   = document.getElementById('authForm');
-    const authEmail  = document.getElementById('authEmail');
-    const authPass   = document.getElementById('authPass');
-    const authMsg    = document.getElementById('authMsg');
+    // UI
+    const appEl   = document.getElementById('app');
+    const authCard= document.getElementById('authCard');
+    const userBar = document.getElementById('userBar');
+    const ubEmail = document.getElementById('ubEmail');
+    const authForm= document.getElementById('authForm');
+    const authEmail= document.getElementById('authEmail');
+    const authPass = document.getElementById('authPass');
+    const authMsg  = document.getElementById('authMsg');
     const btnRegister= document.getElementById('btnRegister');
     const btnForgot  = document.getElementById('btnForgot');
     const btnLogout  = document.getElementById('btnLogout');
 
-    const show = (el, v) => el && (el.style.display = v ? '' : 'none');
-    const msg  = (t, cls) => { if(authMsg){ authMsg.textContent=t||''; authMsg.className='status '+(cls||''); } };
+    const show = (el,v)=> el && (el.style.display = v ? '' : 'none');
+    const msg  = (t,cls)=>{ if(authMsg){ authMsg.textContent=t||''; authMsg.className='status '+(cls||''); } };
 
-    // Login
+    function traduzErroAuth(err){
+      const code = err?.code || '';
+      switch(code){
+        case 'auth/configuration-not-found': return 'Authentication não iniciado no projeto. No Firebase Console, clique em "Começar" em Authentication e ative E-mail/Senha.';
+        case 'auth/operation-not-allowed':   return 'Método E-mail/Senha não habilitado no Firebase.';
+        case 'auth/unauthorized-domain':     return 'Domínio não autorizado nas configurações do Authentication.';
+        case 'auth/weak-password':           return 'A senha precisa ter pelo menos 6 caracteres.';
+        case 'auth/invalid-email':           return 'E-mail inválido.';
+        case 'auth/email-already-in-use':    return 'Este e-mail já está cadastrado.';
+        case 'auth/network-request-failed':  return 'Falha de rede (rode via http/https).';
+        default: return (err?.message || 'Erro ao autenticar.');
+      }
+    }
+
     authForm?.addEventListener('submit', async (e)=>{
       e.preventDefault(); msg('Entrando...', 'ok');
-      try{
-        await signInWithEmailAndPassword(auth, authEmail.value.trim(), authPass.value);
-        msg('', '');
-      }catch(err){ msg('Falha no login: ' + (err?.message || err), 'err'); }
+      try{ await signInWithEmailAndPassword(auth, authEmail.value.trim(), authPass.value); msg('',''); }
+      catch(err){ console.error(err); msg('Falha no login: ' + traduzErroAuth(err), 'err'); }
     });
 
-    // Criar conta
     btnRegister?.addEventListener('click', async ()=>{
+      if(authPass.value.length < 6){ msg('A senha precisa ter pelo menos 6 caracteres.', 'warn'); return; }
       msg('Criando conta...', 'ok');
-      try{
-        await createUserWithEmailAndPassword(auth, authEmail.value.trim(), authPass.value);
-        msg('Conta criada! Você já está logado.', 'ok');
-      }catch(err){ msg('Erro ao criar conta: ' + (err?.message || err), 'err'); }
+      try{ await createUserWithEmailAndPassword(auth, authEmail.value.trim(), authPass.value); msg('Conta criada! Você já está logado.', 'ok'); }
+      catch(err){ console.error(err); msg('Erro ao criar conta: ' + traduzErroAuth(err), 'err'); }
     });
 
-    // Esqueci a senha
     btnForgot?.addEventListener('click', async ()=>{
-      if(!authEmail.value) { msg('Digite o e-mail acima para receber o link.', 'warn'); return; }
-      try{
-        await sendPasswordResetEmail(auth, authEmail.value.trim());
-        msg('Enviamos um link de redefinição para o seu e-mail.', 'ok');
-      }catch(err){ msg('Erro ao enviar e-mail: ' + (err?.message || err), 'err'); }
+      if(!authEmail.value){ msg('Digite o e-mail acima para receber o link.', 'warn'); return; }
+      try{ await sendPasswordResetEmail(auth, authEmail.value.trim()); msg('Enviamos um link de redefinição para o seu e-mail.', 'ok'); }
+      catch(err){ console.error(err); msg('Erro ao enviar e-mail: ' + traduzErroAuth(err), 'err'); }
     });
 
-    // Logout
     btnLogout?.addEventListener('click', ()=> signOut(auth));
 
-    // Fornece chaves por usuário para o CRM
+    // chaves por usuário (para o CRM)
     window.AUTH = { user: null };
     window.getLSKey  = () => "pixelup_crm_leads_v1_" + (window.AUTH?.user?.uid || "guest");
     window.getTplKey = () => "pixelup_crm_wa_template_v1_" + (window.AUTH?.user?.uid || "guest");
 
-    // Reagir às mudanças de login
     onAuthStateChanged(auth, (user)=>{
       window.AUTH.user = user || null;
       show(appEl, !!user);
       show(userBar, !!user);
       show(authCard, !user);
-      if (user) { ubEmail.textContent = user.email || ''; }
-
-      try{
-        if (window.__reloadUserData) window.__reloadUserData();
-      }catch(_) {}
+      if (user) ubEmail.textContent = user.email || '';
+      try{ if(window.__reloadUserData) window.__reloadUserData(); }catch(_){}
     });
 
-    // mostra a tela de auth até sabermos o estado
+    // até saber o estado, mostra login
     show(authCard, true);
     show(appEl, false);
   </script>
