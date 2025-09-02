@@ -360,7 +360,7 @@
     if(changed) safeSetJSON(__getLSKey(), leads);
     const persist=()=>safeSetJSON(__getLSKey(), leads);
 
-    const esc = s => String(s||"").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+    const esc = s => String(s||"").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;","»":"&raquo;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));
     const digits = s => String(s||"").replace(/\D/g,'');
     function parseDateTs(str,end){if(!str)return null;let y,m,d;if(str.includes("-")){const p=str.split("-");y=+p[0];m=+p[1]-1;d=+p[2];}else if(str.includes("/")){const p=str.split("/");d=+p[0];m=+p[1]-1;y=+p[2];}else return null;return new Date(y,m,d,end?23:0,end?59:0,end?59:0,end?999:0).getTime();}
     const qualName = q => q==="quente"?"Led Quente": q==="morno"?"Led Morno": q==="frio"?"Led Frio":"";
