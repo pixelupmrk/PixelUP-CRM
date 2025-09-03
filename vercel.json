@@ -9,3 +9,6 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
+PORT=3000
+GEMINI_API_KEY=  -H 'X-goog-api-key: GEMINI_API_KEY' \
+
