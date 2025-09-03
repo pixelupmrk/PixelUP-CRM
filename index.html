@@ -992,3 +992,32 @@
     document.body.appendChild(script);
 });
 </script>
+// Função para chamar a API
+function chamarAPI(mensagem) {
+  fetch('URL_DA_API', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      mensagem: mensagem
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Resposta da API:', data);
+    // Aqui você pode usar os dados retornados para atualizar o bot
+  })
+  .catch(error => {
+    console.error('Erro ao chamar a API:', error);
+  });
+}
+
+// Função para escutar mensagens
+function escutarMensagens(mensagem) {
+  // Aqui você pode colocar a lógica de escuta, por exemplo, se a mensagem for qualquer uma, ele chama a API
+  chamarAPI(mensagem);
+}
+
+// Exemplo de uso: quando uma mensagem é recebida
+escutarMensagens('Qualquer mensagem');
