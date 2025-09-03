@@ -181,3 +181,33 @@ BOT_NAME=PixelUp Bot
     "whatsapp-web.js": "^1.23.0"
   }
 }
+document.addEventListener("DOMContentLoaded", function() {
+    // Função para chamar a API
+    function chamarAPI(mensagem) {
+        fetch('URL_DA_API', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                mensagem: mensagem
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Resposta da API:', data);
+            // Aqui você pode atualizar o bot com os dados retornados
+        })
+        .catch(error => {
+            console.error('Erro ao chamar a API:', error);
+        });
+    }
+
+    // Função para escutar mensagens (exemplo simples)
+    function escutarMensagens(mensagem) {
+        chamarAPI(mensagem);
+    }
+
+    // Exemplo de uso: quando uma mensagem é recebida
+    escutarMensagens('Qualquer mensagem');
+});
