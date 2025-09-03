@@ -981,3 +981,14 @@
   </script>
 </body>
 </html>
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // Supondo que o script do wa-bot esteja em 'wa-bot/wa-bot.js'
+    let script = document.createElement('script');
+    script.src = 'wa-bot/wa-bot.js';
+    script.onload = function() {
+      console.log('wa-bot script carregado com sucesso!');
+    };
+    document.body.appendChild(script);
+});
+</script>
