@@ -361,3 +361,16 @@
   </noscript>
 </body>
 </html>
+<script>
+async function enviarMensagem(msg) {
+  const r = await fetch("http://localhost:3000/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: msg })
+  });
+  const data = await r.json();
+  // data.reply é a resposta do bot
+  console.log("Bot:", data.reply);
+  // TODO: inserir no seu componente de chat
+}
+</script>
